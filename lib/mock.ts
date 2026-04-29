@@ -1,4 +1,4 @@
-import { Employee, AttendanceRecord, Holiday, LeaveRequest, User, Department, Designation, LeaveBalance } from './types';
+import { Employee, AttendanceRecord, EmployeeAttendanceRecord, Holiday, LeaveRequest, User, Department, Designation, LeaveBalance } from './types';
 
 export const mockUsers: Partial<User>[] = [
   {
@@ -232,7 +232,7 @@ export const mockHolidays: Holiday[] = [
   }
 ];
 
-export const mockAttendance: AttendanceRecord[] = [
+export const mockAttendance: EmployeeAttendanceRecord[] = [
   {
     id: '1',
     employeeId: '1',
@@ -310,7 +310,7 @@ export const getEmployeesByDepartment = (department: string): Partial<Employee>[
   return mockEmployees.filter(emp => emp.department === department);
 };
 
-export const getAttendanceByEmployee = (employeeId: string, month?: string): AttendanceRecord[] => {
+export const getAttendanceByEmployee = (employeeId: string, month?: string): EmployeeAttendanceRecord[] => {
   return mockAttendance.filter(record => {
     if (record.employeeId !== employeeId) return false;
     if (month) {

@@ -48,6 +48,19 @@ export interface AttendanceRecord {
   remarks?: string;
 }
 
+export interface EmployeeAttendanceRecord {
+  id: string;
+  _id?: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  status: 'present' | 'absent' | 'leave' | 'late' | 'half-day';
+  checkIn?: string;
+  checkOut?: string;
+  hoursWorked?: number;
+  remarks?: string;
+}
+
 export interface Book {
   id: string;
   _id?: string;
