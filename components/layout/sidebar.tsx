@@ -47,14 +47,14 @@ const navigation = [
     { name: 'Reports', href: '/reports', icon: FileText, roles: ['admin', 'hr', 'hod', 'professor', 'assistant_professor', 'staff'] },
   ]},
   { group: 'HR & Staff', items: [
-    { name: 'Staff Management', href: '/employees', icon: Users, roles: ['admin', 'hr', 'hod'] },
+
     { name: 'Holidays', href: '/holidays', icon: CalendarDays, roles: ['admin', 'hr', 'hod', 'professor', 'assistant_professor', 'staff', 'student'] },
     { name: 'Leaves', href: '/leaves', icon: FileText, roles: ['admin', 'hr', 'hod', 'professor', 'assistant_professor', 'staff'] },
     { name: 'Salary Manager', href: '/salary-manager', icon: Briefcase, roles: ['admin', 'hr'] },
   ]},
   { group: 'System', items: [
     { name: 'Announcements', href: '/announcements', icon: Bell, roles: ['admin', 'hr', 'hod', 'professor', 'assistant_professor', 'staff', 'student'] },
-    { name: "Settings", href: '/settings', icon: Settings, roles: ['admin', 'hr'] },
+
     { name: "Reset Password", href: '/reset-emp-password', icon: Key, roles: ['admin', 'hr'] }
   ]}
 ];

@@ -18,9 +18,10 @@ interface Employee { _id: string; name: string; employeeId: string; }
 interface Props {
   token:     string;
   employees: Employee[];
+  title?:    string;
 }
 
-const ManagerKRAPanel: React.FC<Props> = ({ token, employees }) => {
+const ManagerKRAPanel: React.FC<Props> = ({ token, employees, title = "Objective Analysis" }) => {
   const [empId,   setEmpId]   = useState("");
   const [date,    setDate]    = useState(new Date().toISOString().split("T")[0]);
   const [rating,  setRating]  = useState(0);
@@ -80,7 +81,7 @@ const ManagerKRAPanel: React.FC<Props> = ({ token, employees }) => {
       
       <div className="flex items-center gap-3 mb-8 border-b border-slate-800 pb-4">
         <Target className="h-5 w-5 text-blue-500" />
-        <h3 className="text-lg font-black uppercase tracking-widest text-white">Objective Analysis</h3>
+        <h3 className="text-lg font-black uppercase tracking-widest text-white">{title}</h3>
       </div>
 
       <div className="space-y-6">

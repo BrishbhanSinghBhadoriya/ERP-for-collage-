@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -13,11 +13,14 @@ import {
   BookOpen,
   PieChart,
   BarChart3,
-  Calendar
+  Calendar,
+  Pencil,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { attendanceApi, feeApi } from '@/services/api';
 import { useFetch } from '@/hooks/use-fetch';
-import { cn } from '@/lib/utils';
+import { cn, extractData } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   BarChart, 
@@ -31,6 +34,17 @@ import {
   Line,
   Cell
 } from 'recharts';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle,
+  DialogFooter 
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
 import { useAuth } from '@/lib/auth-context';
 import { RoleGuard } from '@/components/auth/role-guard';
@@ -74,7 +88,18 @@ export default function ReportsPage() {
 
   const [activeTab, setActiveTab] = useState<'attendance' | 'fees'>('attendance');
   
-  const { data: attendanceData } = useFetch<any>(async () => {
+  const [attendanceOverrides, setAttendanceOverrides] = useState<any>(null);
+  const [feeOverrides, setFeeOverrides] = useState<any>(null);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingSection, setEditingSection] = useState<{type: 'attendance' | 'fees', key: string, label: string} | null>(null);
+  const [tempValue, setTempValue] = useState('');
+  const [tempTrend, setTempTrend] = useState('');
+
+  const [isChartEditModalOpen, setIsChartEditModalOpen] = useState(false);
+  const [editingChartItem, setEditingChartItem] = useState<{type: 'attendance' | 'fees', index: number, name: string, value: number} | null>(null);
+
+  const { data: attendanceDataFetched } = useFetch<any>(async () => {
     try {
       const response = await attendanceApi.getAttendance();
       const rows = Array.isArray(response?.data) ? response.data : [];
@@ -91,7 +116,8 @@ export default function ReportsPage() {
       return STATIC_ATTENDANCE_REPORT;
     }
   });
-  const { data: feeData } = useFetch<any>(async () => {
+
+  const { data: feeDataFetched } = useFetch<any>(async () => {
     try {
       const response = await feeApi.getStats();
       const payload = response?.data || {};
@@ -110,6 +136,52 @@ export default function ReportsPage() {
       return STATIC_FEE_REPORT;
     }
   });
+
+  const attendanceData = useMemo(() => {
+    const base = attendanceDataFetched || STATIC_ATTENDANCE_REPORT;
+    return attendanceOverrides ? { ...base, ...attendanceOverrides } : base;
+  }, [attendanceDataFetched, attendanceOverrides]);
+
+  const feeData = useMemo(() => {
+    const base = feeDataFetched || STATIC_FEE_REPORT;
+    return feeOverrides ? { ...base, ...feeOverrides } : base;
+  }, [feeDataFetched, feeOverrides]);
+
+  const handleSaveStat = () => {
+    if (!editingSection) return;
+    const val = tempValue.includes('%') ? parseInt(tempValue.replace('%', '')) : parseInt(tempValue);
+    
+    if (editingSection.type === 'attendance') {
+      setAttendanceOverrides((prev: any) => ({
+        ...(prev || {}),
+        [editingSection.key]: val,
+        trend: tempTrend || (prev || {}).trend
+      }));
+    } else {
+      setFeeOverrides((prev: any) => ({
+        ...(prev || {}),
+        [editingSection.key]: val
+      }));
+    }
+    setIsEditModalOpen(false);
+    toast.success('Report updated');
+  };
+
+  const handleSaveChartItem = () => {
+    if (!editingChartItem) return;
+    
+    if (editingChartItem.type === 'attendance') {
+      const newTrends = [...(attendanceData.trends || [])];
+      newTrends[editingChartItem.index] = { ...newTrends[editingChartItem.index], percentage: editingChartItem.value };
+      setAttendanceOverrides((prev: any) => ({ ...(prev || {}), trends: newTrends }));
+    } else {
+      const newByCourse = [...(feeData.byCourse || [])];
+      newByCourse[editingChartItem.index] = { ...newByCourse[editingChartItem.index], collected: editingChartItem.value };
+      setFeeOverrides((prev: any) => ({ ...(prev || {}), byCourse: newByCourse }));
+    }
+    setIsChartEditModalOpen(false);
+    toast.success('Chart data updated');
+  };
 
   const chartData = activeTab === 'attendance' 
     ? (attendanceData?.trends || []) 
@@ -151,15 +223,30 @@ export default function ReportsPage() {
         <TabsContent value="attendance" className="space-y-8 mt-0 focus-visible:outline-none">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { label: "AVG ATTENDANCE", value: (attendanceData?.avgAttendance || 0) + "%", trend: attendanceData?.trend || "+0% vs last month", color: "text-emerald-500", icon: TrendingUp },
-              { label: "TOTAL LECTURES", value: attendanceData?.totalLectures || 0, trend: "This semester", color: "text-blue-500", icon: BookOpen },
-              { label: "LOW ATTENDANCE", value: attendanceData?.lowAttendanceCount || 0, trend: "Requires attention", color: "text-rose-500", icon: Users },
+              { label: "AVG ATTENDANCE", value: (attendanceData?.avgAttendance || 0) + "%", trend: attendanceData?.trend || "+0% vs last month", color: "text-emerald-500", icon: TrendingUp, key: 'avgAttendance' },
+              { label: "TOTAL LECTURES", value: attendanceData?.totalLectures || 0, trend: "This semester", color: "text-blue-500", icon: BookOpen, key: 'totalLectures' },
+              { label: "LOW ATTENDANCE", value: attendanceData?.lowAttendanceCount || 0, trend: "Requires attention", color: "text-rose-500", icon: Users, key: 'lowAttendanceCount' },
             ].map((stat, i) => (
-              <Card key={i} className="rounded-[2rem] border border-border bg-card p-8 shadow-xl">
+              <Card key={i} className="rounded-[2rem] border border-border bg-card p-8 shadow-xl group relative overflow-hidden">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 rounded-2xl bg-slate-900">
                     <stat.icon className={cn("h-6 w-6", stat.color)} />
                   </div>
+                  {isAdminOrHODOrHR && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => {
+                        setEditingSection({ type: 'attendance', key: stat.key, label: stat.label });
+                        setTempValue(String(stat.value));
+                        setTempTrend(stat.trend);
+                        setIsEditModalOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-3 w-3 text-slate-500" />
+                    </Button>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">{stat.label}</h3>
@@ -224,9 +311,24 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent className="px-0 pb-0 space-y-6">
                 {(attendanceData?.byDepartment || []).map((dept: any, i: number) => (
-                  <div key={i} className="space-y-2">
+                  <div key={i} className="space-y-2 group">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-black text-white uppercase tracking-widest">{dept.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-white uppercase tracking-widest">{dept.name}</span>
+                        {isAdminOrHODOrHR && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => {
+                              setEditingChartItem({ type: 'attendance', index: i, name: dept.name, value: dept.percentage });
+                              setIsChartEditModalOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-2.5 w-2.5 text-slate-500" />
+                          </Button>
+                        )}
+                      </div>
                       <span className="text-xs font-black text-emerald-500">{dept.percentage}%</span>
                     </div>
                     <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden">
@@ -245,15 +347,30 @@ export default function ReportsPage() {
         <TabsContent value="fees" className="space-y-8 mt-0 focus-visible:outline-none">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { label: "TOTAL COLLECTED", value: "₹" + (feeData?.totalCollected || 0), trend: "This academic year", color: "text-emerald-500", icon: CreditCard },
-              { label: "TOTAL PENDING", value: "₹" + (feeData?.totalPending || 0), trend: "Action required", color: "text-rose-500", icon: Calendar },
-              { label: "SCHOLARSHIPS", value: "₹" + (feeData?.totalScholarships || 0), trend: "Financial aid", color: "text-blue-500", icon: Users },
+              { label: "TOTAL COLLECTED", value: "₹" + (feeData?.totalCollected || 0), trend: "This academic year", color: "text-emerald-500", icon: CreditCard, key: 'totalCollected' },
+              { label: "TOTAL PENDING", value: "₹" + (feeData?.totalPending || 0), trend: "Action required", color: "text-rose-500", icon: Calendar, key: 'totalPending' },
+              { label: "SCHOLARSHIPS", value: "₹" + (feeData?.totalScholarships || 0), trend: "Financial aid", color: "text-blue-500", icon: Users, key: 'totalScholarships' },
             ].map((stat, i) => (
-              <Card key={i} className="rounded-[2rem] border border-border bg-card p-8 shadow-xl">
+              <Card key={i} className="rounded-[2rem] border border-border bg-card p-8 shadow-xl group relative overflow-hidden">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 rounded-2xl bg-slate-900">
                     <stat.icon className={cn("h-6 w-6", stat.color)} />
                   </div>
+                  {isAdminOrHODOrHR && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => {
+                        setEditingSection({ type: 'fees', key: stat.key, label: stat.label });
+                        setTempValue(String(stat.value).replace('₹', ''));
+                        setTempTrend(stat.trend);
+                        setIsEditModalOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-3 w-3 text-slate-500" />
+                    </Button>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">{stat.label}</h3>
@@ -341,7 +458,65 @@ export default function ReportsPage() {
             </Card>
           </div>
         </TabsContent>
-      </Tabs></div>
+      </Tabs>
+
+      {/* Edit Stat Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">Edit {editingSection?.label}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Value</Label>
+              <Input 
+                value={tempValue}
+                onChange={(e) => setTempValue(e.target.value)}
+                className="bg-slate-950 border-border rounded-xl font-black text-white"
+              />
+            </div>
+            {editingSection?.type === 'attendance' && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Trend Text</Label>
+                <Input 
+                  value={tempTrend}
+                  onChange={(e) => setTempTrend(e.target.value)}
+                  className="bg-slate-950 border-border rounded-xl font-black text-white uppercase text-xs"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)} className="rounded-xl border-border font-black text-[10px] tracking-widest uppercase">Cancel</Button>
+            <Button onClick={handleSaveStat} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] tracking-widest uppercase">Update</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Chart Item Edit Modal */}
+      <Dialog open={isChartEditModalOpen} onOpenChange={setIsChartEditModalOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">Edit {editingChartItem?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Percentage / Amount</Label>
+              <Input 
+                type="number"
+                value={editingChartItem?.value}
+                onChange={(e) => setEditingChartItem(prev => prev ? { ...prev, value: Number(e.target.value) } : null)}
+                className="bg-slate-950 border-border rounded-xl font-black text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsChartEditModalOpen(false)} className="rounded-xl border-border font-black text-[10px] tracking-widest uppercase">Cancel</Button>
+            <Button onClick={handleSaveChartItem} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] tracking-widest uppercase">Update</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
     </RoleGuard>
   );
 }

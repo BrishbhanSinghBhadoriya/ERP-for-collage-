@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
@@ -15,7 +14,9 @@ import {
   MapPin,
   FileText,
   Filter,
-  CheckCircle2
+  CheckCircle2,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import { examApi } from '@/services/api';
 import { useFetch } from '@/hooks/use-fetch';
@@ -24,7 +25,18 @@ import { cn, extractList, extractData } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { RoleGuard } from '@/components/auth/role-guard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter 
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
 const STATIC_EXAM_DATE_SHEET: Record<string, any>[] = [
   {
@@ -77,17 +89,84 @@ const STATIC_EXAM_DATE_SHEET: Record<string, any>[] = [
 export default function ExamsPage() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [examList, setExamList] = useState<any[]>([]);
+  const [isExamModalOpen, setIsExamModalOpen] = useState(false);
+  const [editingExam, setEditingExam] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    date: dayjs().format('YYYY-MM-DD'),
+    course: '',
+    subjectName: '',
+    subjectCode: '',
+    examName: '',
+    semester: 1,
+    maxMarks: 100
+  });
 
   const { data: dateSheet, loading: dateSheetLoading } = useFetch<any[]>(examApi.getDateSheet);
   const { data: stats, loading: statsLoading } = useFetch<any>(examApi.getStats);
 
+  useEffect(() => {
+    const list = extractList<Record<string, any>>(dateSheet);
+    setExamList(list.length ? list : STATIC_EXAM_DATE_SHEET);
+  }, [dateSheet]);
+
   const isAdminOrHODOrHR = user?.role === 'admin' || user?.role === 'hod' || user?.role === 'hr';
 
-  const examList = useMemo(() => {
-    const list = extractList<Record<string, any>>(dateSheet);
-    return list.length ? list : STATIC_EXAM_DATE_SHEET;
-  }, [dateSheet]);
   const statsData = useMemo(() => extractData<Record<string, any>>(stats), [stats]);
+
+  const handleSaveExam = () => {
+    const newExam = {
+      id: editingExam?.id || `exam-${Date.now()}`,
+      date: dayjs(formData.date).toISOString(),
+      course: { name: formData.course },
+      subject: { name: formData.subjectName, code: formData.subjectCode },
+      name: formData.examName,
+      semester: Number(formData.semester),
+      maxMarks: Number(formData.maxMarks),
+    };
+
+    if (editingExam) {
+      setExamList(prev => prev.map(e => e.id === editingExam.id ? newExam : e));
+      toast.success('Exam details updated successfully');
+    } else {
+      setExamList(prev => [newExam, ...prev]);
+      toast.success('New exam deployed successfully');
+    }
+    setIsExamModalOpen(false);
+  };
+
+  const handleDeleteExam = (id: string) => {
+    setExamList(prev => prev.filter(e => e.id !== id));
+    toast.success('Exam record deleted');
+  };
+
+  const openAddModal = () => {
+    setEditingExam(null);
+    setFormData({
+      date: dayjs().format('YYYY-MM-DD'),
+      course: '',
+      subjectName: '',
+      subjectCode: '',
+      examName: '',
+      semester: 1,
+      maxMarks: 100
+    });
+    setIsExamModalOpen(true);
+  };
+
+  const openEditModal = (exam: any) => {
+    setEditingExam(exam);
+    setFormData({
+      date: dayjs(exam.date).format('YYYY-MM-DD'),
+      course: exam.course?.name || '',
+      subjectName: exam.subject?.name || '',
+      subjectCode: exam.subject?.code || '',
+      examName: exam.name || '',
+      semester: exam.semester || 1,
+      maxMarks: exam.maxMarks || 100
+    });
+    setIsExamModalOpen(true);
+  };
 
   const filteredDateSheet = useMemo(() => {
     return examList.filter((exam: any) => 
@@ -119,7 +198,10 @@ export default function ExamsPage() {
               <Download className="mr-2 h-4 w-4" /> Download Manifest
             </Button>
             {isAdminOrHODOrHR && (
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-12 px-6 font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all hover:scale-105">
+              <Button 
+                onClick={openAddModal}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-12 px-6 font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all hover:scale-105"
+              >
                 <Plus className="mr-2 h-4 w-4" /> Deploy Exam
               </Button>
             )}
@@ -230,6 +312,30 @@ export default function ExamsPage() {
                       label: 'MAX MARKS',
                       render: (v) => <span className="font-black text-blue-400 text-xs uppercase tracking-widest">{v ?? 'N/A'}</span>,
                 },
+                {
+                  key: 'actions',
+                  label: 'ACTIONS',
+                  render: (_, row) => (
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-lg text-slate-500 hover:text-white hover:bg-slate-900"
+                        onClick={() => openEditModal(row)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-lg text-slate-500 hover:text-rose-500 hover:bg-rose-500/10"
+                        onClick={() => handleDeleteExam(row.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )
+                }
               ]}
             />
           </CardContent>
@@ -276,6 +382,97 @@ export default function ExamsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Exam Add/Edit Modal */}
+      <Dialog open={isExamModalOpen} onOpenChange={setIsExamModalOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">
+              {editingExam ? 'Edit Exam Details' : 'Deploy New Exam'}
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">
+              Configure examination logistics and timeline
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Exam Date</Label>
+                <Input 
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Semester</Label>
+                <Input 
+                  type="number"
+                  value={formData.semester}
+                  onChange={(e) => setFormData({ ...formData, semester: Number(e.target.value) })}
+                  className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Course Name</Label>
+              <Input 
+                value={formData.course}
+                onChange={(e) => setFormData({ ...formData, course: e.target.value })}
+                className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
+                placeholder="E.G. B.TECH CSE"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Subject Name</Label>
+                <Input 
+                  value={formData.subjectName}
+                  onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
+                  className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
+                  placeholder="E.G. DBMS"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Subject Code</Label>
+                <Input 
+                  value={formData.subjectCode}
+                  onChange={(e) => setFormData({ ...formData, subjectCode: e.target.value })}
+                  className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
+                  placeholder="E.G. CSE-203"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Exam Name</Label>
+                <Input 
+                  value={formData.examName}
+                  onChange={(e) => setFormData({ ...formData, examName: e.target.value })}
+                  className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
+                  placeholder="E.G. MID-SEMESTER"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Max Marks</Label>
+                <Input 
+                  type="number"
+                  value={formData.maxMarks}
+                  onChange={(e) => setFormData({ ...formData, maxMarks: Number(e.target.value) })}
+                  className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExamModalOpen(false)} className="rounded-xl border-border uppercase font-black text-[10px] tracking-widest">Cancel</Button>
+            <Button onClick={handleSaveExam} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl uppercase font-black text-[10px] tracking-widest">
+              {editingExam ? 'Save Changes' : 'Deploy Exam'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </RoleGuard>
   );
 }

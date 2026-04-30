@@ -84,40 +84,10 @@ const Personal_Info = () => {
             value={get(user?.gender)}
             accentColor="bg-amber-600"
           />
-          <Tile
-            icon={Activity}
-            label="Marital Status"
-            value={get(user?.maritalStatus)}
-            accentColor="bg-cyan-600"
-          />
+         
         </div>
 
-        <div className="mt-8 pt-8 border-t border-slate-800/50 grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
-              <MapPin className="h-3 w-3 text-blue-500" /> Current Sector
-            </h4>
-            <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 min-h-[100px]">
-              <p className="text-sm font-bold text-slate-300 uppercase tracking-wider leading-relaxed">
-                {typeof user?.address === 'object' 
-                  ? `${(user as any)?.address?.street || ''} ${(user as any)?.address?.city || ''} ${(user as any)?.address?.state || ''}`
-                  : user?.address || 'UNSPECIFIED'}
-              </p>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
-              <Globe className="h-3 w-3 text-blue-500" /> Permanent Sector
-            </h4>
-            <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 min-h-[100px]">
-              <p className="text-sm font-bold text-slate-300 uppercase tracking-wider leading-relaxed">
-                {typeof user?.permanentAddress === 'object' 
-                  ? `${(user as any)?.permanentAddress?.street || ''} ${(user as any)?.permanentAddress?.city || ''} ${(user as any)?.permanentAddress?.state || ''}`
-                  : user?.permanentAddress || 'MATCHES CURRENT SECTOR'}
-              </p>
-            </div>
-          </div>
-        </div>
+        
       </CardContent>
     </Card>
   );

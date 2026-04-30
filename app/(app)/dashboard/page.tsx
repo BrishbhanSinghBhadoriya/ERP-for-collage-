@@ -10,6 +10,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn, extractList, extractData } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Users,
   Calendar,
   FileText,
@@ -26,9 +33,23 @@ import {
   Eye,
   ClipboardList,
   BarChart3,
+  MapPin,
+  Timer,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useEffect, useState } from 'react';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { toast } from 'sonner';
 import Cookies from 'js-cookie';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -72,6 +93,73 @@ export default function DashboardPage() {
   const { data: recentAdmissions, loading: admissionsLoading } = useFetch<any[]>(dashboardApi.getRecentAdmissions, { immediate: userRole !== 'student' });
   const { data: upcomingExams, loading: examsLoading } = useFetch<any[]>(examApi.getUpcoming, { immediate: true });
   const { data: announcements, loading: announcementsLoading } = useFetch<any[]>(announcementApi.getAll, { immediate: true });
+
+  const [isTimetableOpen, setIsTimetableOpen] = useState(false);
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [editingLecture, setEditingLecture] = useState<any>(null);
+
+  const [timetable, setTimetable] = useState([
+    { id: 1, name: "Lecture 1", time: "10:00 AM - 10:50 AM", subject: "Engineering Mathematics", room: "Room 101", type: "Lecture" },
+    { id: 2, name: "Lecture 2", time: "11:00 AM - 11:50 AM", subject: "Data Structures", room: "Lab 2", type: "Practical" },
+    { id: 3, name: "Lecture 3", time: "12:00 PM - 12:50 PM", subject: "Computer Networks", room: "Room 203", type: "Lecture" },
+    { id: 4, name: "Lecture 4", time: "01:00 PM - 01:50 PM", subject: "Operating Systems", room: "Room 105", type: "Lecture" },
+    { id: 5, name: "Lecture 5", time: "02:00 PM - 02:50 PM", subject: "Database Management", room: "Lab 1", type: "Practical" },
+    { id: 6, name: "Lecture 6", time: "03:00 PM - 03:50 PM", subject: "Software Engineering", room: "Room 302", type: "Lecture" },
+    { id: 7, name: "Lecture 7", time: "04:00 PM - 04:50 PM", subject: "Cyber Security", room: "Room 201", type: "Lecture" },
+    { id: 8, name: "Lecture 8", time: "05:00 PM - 05:50 PM", subject: "Artificial Intelligence", room: "Room 404", type: "Lecture" },
+  ]);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    subject: "",
+    time: "",
+    room: "",
+    type: "Lecture"
+  });
+
+  const handleAddEditLecture = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingLecture) {
+      setTimetable(prev => prev.map(l => l.id === editingLecture.id ? { ...l, ...formData } : l));
+      toast.success("Lecture updated successfully");
+    } else {
+      const newId = timetable.length > 0 ? Math.max(...timetable.map(l => l.id)) + 1 : 1;
+      setTimetable(prev => [...prev, { id: newId, ...formData }]);
+      toast.success("Lecture added successfully");
+    }
+    setIsManageModalOpen(false);
+    setEditingLecture(null);
+    setFormData({ name: "", subject: "", time: "", room: "", type: "Lecture" });
+  };
+
+  const deleteLecture = (id: number) => {
+    setTimetable(prev => prev.filter(l => l.id !== id));
+    toast.success("Lecture deleted successfully");
+  };
+
+  const openEditModal = (lecture: any) => {
+    setEditingLecture(lecture);
+    setFormData({
+      name: lecture.name,
+      subject: lecture.subject,
+      time: lecture.time,
+      room: lecture.room,
+      type: lecture.type
+    });
+    setIsManageModalOpen(true);
+  };
+
+  const openAddModal = () => {
+    setEditingLecture(null);
+    setFormData({
+      name: `Lecture ${timetable.length + 1}`,
+      subject: "",
+      time: "09:00 AM - 09:50 AM",
+      room: "",
+      type: "Lecture"
+    });
+    setIsManageModalOpen(true);
+  };
 
   const statsData = useMemo(() => extractData<Record<string, any>>(stats), [stats]);
   const trendsData = useMemo(() => extractData<Record<string, any>>(trends), [trends]);
@@ -160,12 +248,13 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-              <Button className="bg-blue-600 text-white hover:bg-blue-700 rounded-2xl px-8 py-7 h-auto font-black text-lg shadow-[0_0_30px_rgba(37,99,235,0.3)] transition-all hover:scale-105">
+              <Button 
+                onClick={() => setIsTimetableOpen(true)}
+                className="bg-blue-600 text-white hover:bg-blue-700 rounded-2xl px-8 py-7 h-auto font-black text-lg shadow-[0_0_30px_rgba(37,99,235,0.3)] transition-all hover:scale-105"
+              >
                 TIMETABLE
               </Button>
-              <Button variant="outline" className="border-2 border-border bg-transparent text-white hover:bg-accent rounded-2xl px-8 py-7 h-auto font-black text-lg transition-all hover:scale-105">
-                EXAM CENTER
-              </Button>
+              
             </div>
           </div>
 
@@ -380,10 +469,10 @@ export default function DashboardPage() {
           {isStaffOrAbove && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: 'Admission', icon: Plus, color: 'bg-blue-600', href: '/students/new', roles: ['admin', 'hr', 'hod'] },
+                { label: 'Admission', icon: Plus, color: 'bg-blue-600', href: '/students', roles: ['admin', 'hr', 'hod'] },
                 { label: 'Attendance', icon: Calendar, color: 'bg-emerald-600', href: '/attendance', roles: ['admin', 'hr', 'hod', 'professor', 'assistant_professor'] },
-                { label: 'Fee Receipt', icon: CreditCard, color: 'bg-amber-50', href: '/fees/new', roles: ['admin', 'hr', 'staff'] },
-                { label: 'Add Exam', icon: ClipboardList, color: 'bg-purple-600', href: '/exams/new', roles: ['admin', 'hr', 'hod'] },
+                { label: 'Fee Receipt', icon: CreditCard, color: 'bg-black', href: '/fees', roles: ['admin', 'hr', 'staff'] },
+                { label: 'Add Exam', icon: ClipboardList, color: 'bg-purple-600', href: '/exams', roles: ['admin', 'hr', 'hod'] },
               ].filter(action => action.roles.includes(userRole)).map((action, i) => (
                 <Link key={i} href={action.href || '#'}>
                   <div className="group flex flex-col items-center justify-center p-6 bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-slate-50">
@@ -423,7 +512,7 @@ export default function DashboardPage() {
               ) : (
                 <p className="text-sm text-slate-500 font-medium text-center py-4">No recent announcements</p>
               )}
-              <Button variant="outline" className="w-full mt-4 rounded-xl font-bold border-2 border-slate-200 hover:bg-slate-50 text-black">
+              <Button variant="outline" className="w-full mt-4 rounded-xl font-bold border-2 border-slate-200 hover:bg-slate-50 text-white">
                 View All Announcements
               </Button>
             </CardContent>
@@ -462,6 +551,212 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
+
+      {/* Timetable Dialog */}
+      <Dialog open={isTimetableOpen} onOpenChange={setIsTimetableOpen}>
+        <DialogContent className="max-w-4xl bg-slate-950 border-slate-800 p-0 overflow-hidden rounded-[2.5rem]">
+          <div className="bg-blue-600 p-8 text-white relative overflow-hidden">
+            <div className="relative z-10 flex justify-between items-center">
+              <DialogHeader>
+                <DialogTitle className="text-3xl font-black uppercase tracking-tighter">Academic Schedule</DialogTitle>
+                <DialogDescription className="text-blue-100 font-bold uppercase text-xs tracking-[0.2em] mt-2">
+                  Daily Lecture Timeline • 50m Sessions • 10m Intervals
+                </DialogDescription>
+              </DialogHeader>
+              <Button 
+                onClick={openAddModal}
+                className="bg-white text-blue-600 hover:bg-blue-50 rounded-xl font-black text-xs uppercase tracking-widest px-6 py-4 h-auto shadow-xl transition-all hover:scale-105"
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add Lecture
+              </Button>
+            </div>
+            <div className="absolute top-0 right-0 -mt-10 -mr-10 h-40 w-40 bg-white/10 rounded-full blur-3xl" />
+          </div>
+
+          <div className="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar bg-slate-950">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 mb-6 bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl">
+                <Timer className="h-5 w-5 text-blue-500" />
+                <div>
+                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Campus Doors Open</p>
+                  <p className="text-sm font-bold text-white uppercase">Reporting Time: 09:30 AM</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4">
+                {timetable.map((lecture, idx) => (
+                  <div key={lecture.id}>
+                    <div className="group relative flex items-center gap-6 p-5 rounded-[1.5rem] bg-slate-900/50 border border-slate-800 transition-all hover:border-blue-500/50 hover:bg-slate-900">
+                      <div className="flex flex-col items-center justify-center min-w-[80px] h-20 rounded-2xl bg-slate-950 border border-slate-800 shadow-inner group-hover:border-blue-500/30 transition-colors">
+                        <span className="text-[10px] font-black text-slate-500 uppercase">Start</span>
+                        <span className="text-lg font-black text-white">{lecture.time.split(' - ')[0]}</span>
+                      </div>
+
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge className={cn(
+                            "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg",
+                            lecture.type === 'Practical' ? "bg-purple-500/10 text-purple-500 border-purple-500/20" : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                          )}>
+                            {lecture.name}
+                          </Badge>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{lecture.type}</span>
+                        </div>
+                        <h4 className="text-xl font-black text-white tracking-tight">{lecture.subject}</h4>
+                        <div className="flex items-center gap-4 mt-2">
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="h-3 w-3 text-slate-500" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{lecture.room}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3 w-3 text-slate-500" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">50 Minutes</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          onClick={() => openEditModal(lecture)}
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-10 w-10 rounded-xl hover:bg-blue-500/10 hover:text-blue-500 text-slate-500 transition-all"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          onClick={() => deleteLecture(lecture.id)}
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-10 w-10 rounded-xl hover:bg-rose-500/10 hover:text-rose-500 text-slate-500 transition-all"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="flex flex-col items-center justify-center min-w-[80px] h-20 rounded-2xl bg-slate-950/30 border border-slate-800/50">
+                        <span className="text-[10px] font-black text-slate-700 uppercase">End</span>
+                        <span className="text-lg font-black text-slate-400">{lecture.time.split(' - ')[1]}</span>
+                      </div>
+                    </div>
+
+                    {idx < timetable.length - 1 && (
+                      <div className="flex items-center gap-4 px-10 py-2">
+                        <div className="h-8 w-[2px] bg-gradient-to-b from-blue-500/50 to-transparent ml-10" />
+                        <div className="flex items-center gap-2 bg-amber-500/5 border border-amber-500/10 px-3 py-1 rounded-full">
+                          <Timer className="h-3 w-3 text-amber-500" />
+                          <span className="text-[9px] font-black text-amber-500/80 uppercase tracking-[0.2em]">10 Min Transition Gap</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {timetable.length === 0 && (
+                  <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-[2.5rem] bg-slate-900/20">
+                    <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">No lectures scheduled yet.</p>
+                    <Button onClick={openAddModal} variant="link" className="text-blue-500 font-black mt-2">ADD YOUR FIRST LECTURE</Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Lecture Modal */}
+      <Dialog open={isManageModalOpen} onOpenChange={setIsManageModalOpen}>
+        <DialogContent className="max-w-md bg-slate-950 border-slate-800 p-0 overflow-hidden rounded-[2.5rem]">
+          <div className="bg-slate-900 p-8 border-b border-slate-800">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-white">
+                {editingLecture ? 'Update Lecture' : 'Add New Lecture'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">
+                Configure your academic session details
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <form onSubmit={handleAddEditLecture} className="p-8 space-y-6">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Lecture Identity</Label>
+                <Input 
+                  value={formData.name}
+                  onChange={e => setFormData({...formData, name: e.target.value})}
+                  placeholder="e.g., Lecture 1"
+                  className="bg-slate-900 border-slate-800 h-12 rounded-xl text-white font-bold"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Subject Name</Label>
+                <Input 
+                  value={formData.subject}
+                  onChange={e => setFormData({...formData, subject: e.target.value})}
+                  placeholder="e.g., Data Structures"
+                  className="bg-slate-900 border-slate-800 h-12 rounded-xl text-white font-bold"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Time Slot</Label>
+                  <Input 
+                    value={formData.time}
+                    onChange={e => setFormData({...formData, time: e.target.value})}
+                    placeholder="10:00 AM - 10:50 AM"
+                    className="bg-slate-900 border-slate-800 h-12 rounded-xl text-white font-bold"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Venue / Room</Label>
+                  <Input 
+                    value={formData.room}
+                    onChange={e => setFormData({...formData, room: e.target.value})}
+                    placeholder="Room 101"
+                    className="bg-slate-900 border-slate-800 h-12 rounded-xl text-white font-bold"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Session Type</Label>
+                <Select 
+                  value={formData.type} 
+                  onValueChange={v => setFormData({...formData, type: v})}
+                >
+                  <SelectTrigger className="bg-slate-900 border-slate-800 h-12 rounded-xl text-white font-bold">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                    <SelectItem value="Lecture">Lecture</SelectItem>
+                    <SelectItem value="Practical">Practical</SelectItem>
+                    <SelectItem value="Seminar">Seminar</SelectItem>
+                    <SelectItem value="Workshop">Workshop</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsManageModalOpen(false)}
+                className="flex-1 h-12 rounded-xl border-slate-800 font-bold uppercase text-xs tracking-widest text-slate-400"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                className="flex-1 h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-600/20"
+              >
+                {editingLecture ? 'Update Lecture' : 'Save Lecture'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

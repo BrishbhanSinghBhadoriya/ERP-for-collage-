@@ -684,61 +684,17 @@ return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <Label htmlFor="modal_workmode">Work Mode</Label>
-          <Controller
-            control={jobForm.control}
-            name="workMode"
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger id="modal_workmode">
-                  <SelectValue placeholder="Select work mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="onsite">Onsite</SelectItem>
-                  <SelectItem value="remote">Remote</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
+          <Input id="modal_workmode" {...jobForm.register('workMode')} placeholder="e.g. Onsite, Remote" />
         </div>
         
         <div className="space-y-2">
           <Label htmlFor="modal_jobtype">Job Type</Label>
-          <Controller
-            control={jobForm.control}
-            name="jobType"
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger id="modal_jobtype">
-                  <SelectValue placeholder="Select Job Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="FULL TIME">Full Time</SelectItem>
-                  <SelectItem value="INTERN">Intern</SelectItem>
-                  <SelectItem value="FREELANCE">Freelance</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
+          <Input id="modal_jobtype" {...jobForm.register('jobType')} placeholder="e.g. Full Time, Intern" />
         </div>
         
         <div className="space-y-2">
           <Label htmlFor="modal_reporting">Reporting Manager</Label>
-          <Controller
-            control={jobForm.control}
-            name="reportingTo"
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger id="modal_reporting">
-                  <SelectValue placeholder="Select Reporting Manager" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="atul">Atul</SelectItem>
-                  <SelectItem value="shivam">Shivam</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
+          <Input id="modal_reporting" {...jobForm.register('reportingTo')} placeholder="e.g. Atul, Shivam" />
         </div>
       </div>
     </form>

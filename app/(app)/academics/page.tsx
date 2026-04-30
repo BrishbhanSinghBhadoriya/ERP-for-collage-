@@ -13,14 +13,18 @@ import {
   Layers,
   GraduationCap
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 import { academicsApi, announcementApi } from '@/services/api';
 import { useFetch } from '@/hooks/use-fetch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RoleGuard } from '@/components/auth/role-guard';
 import { useAuth } from '@/lib/auth-context';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
@@ -32,104 +36,118 @@ export default function AcademicsPage() {
   const { data: courses, loading: isLoading } = useFetch<any[]>(academicsApi.getCourseStats);
   const { data: bulletins, loading: bulletinsLoading } = useFetch<any[]>(announcementApi.getAll);
 
+  const [bulletinOverrides, setBulletinOverrides] = useState<any[]>([]);
+  const [deptOverrides, setDeptOverrides] = useState<any[]>([]);
+  const [isBulletinModalOpen, setIsBulletinModalOpen] = useState(false);
+  const [isDeptEditModalOpen, setIsDeptEditModalOpen] = useState(false);
+  const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
+
+  const [newBulletin, setNewBulletin] = useState({ title: '', type: 'Academic' });
+  const [editingDept, setEditingDept] = useState<any>(null);
+  const [newDept, setNewDept] = useState({ key: '', name: '', about: '', programs: '', keywords: '' });
+
   const courseList = useMemo(() => extractList<Record<string, any>>(courses), [courses]);
-  const bulletinList = useMemo(() => extractList<Record<string, any>>(bulletins), [bulletins]);
+  
+  const bulletinList = useMemo(() => {
+    const base = extractList<Record<string, any>>(bulletins);
+    return [...bulletinOverrides, ...base];
+  }, [bulletins, bulletinOverrides]);
 
   const [selectedDeptKey, setSelectedDeptKey] = useState<string>('');
   const [deptDialogOpen, setDeptDialogOpen] = useState(false);
 
-  const departments = useMemo(
-    () =>
-      [
-        {
-          key: 'cse',
-          name: 'Computer Science & Engineering (CSE)',
-          about:
-            'Software engineering, systems, cloud, and modern computing foundations. Ideal for product, full‑stack, and system roles.',
-          programs: ['B.Tech (CSE)', 'BCA', 'MCA'],
-          keywords: ['cse', 'computer', 'software', 'programming', 'coding', 'ai', 'ml'],
-        },
-        {
-          key: 'it',
-          name: 'Information Technology (IT)',
-          about:
-            'Enterprise IT, networking, database systems, and infrastructure operations. Focused on deployment, security, and support.',
-          programs: ['B.Tech (IT)', 'BSc (IT)'],
-          keywords: ['it', 'network', 'database', 'infrastructure', 'security'],
-        },
-        {
-          key: 'aids',
-          name: 'Artificial Intelligence & Data Science (AI-DS)',
-          about:
-            'Data engineering, analytics, ML pipelines, and model deployment. Strong focus on statistics and real‑world datasets.',
-          programs: ['B.Tech (AI-DS)', 'MSc (Data Science)'],
-          keywords: ['ai', 'aids', 'data', 'datascience', 'ml', 'analytics'],
-        },
-        {
-          key: 'ece',
-          name: 'Electronics & Communication Engineering (ECE)',
-          about:
-            'Electronics, communication systems, embedded fundamentals, and signal processing. Strong base for telecom and embedded roles.',
-          programs: ['B.Tech (ECE)'],
-          keywords: ['ece', 'electronics', 'communication', 'embedded', 'signal', 'iot'],
-        },
-        {
-          key: 'me',
-          name: 'Mechanical Engineering (ME)',
-          about:
-            'Manufacturing, design, thermodynamics, and industrial engineering. Suitable for production and automotive domains.',
-          programs: ['B.Tech (ME)', 'Diploma (ME)'],
-          keywords: ['mechanical', 'me', 'manufacturing', 'design', 'automotive'],
-        },
-        {
-          key: 'ce',
-          name: 'Civil Engineering (CE)',
-          about:
-            'Structural design, construction technology, and project planning. Focus on real infrastructure and site practices.',
-          programs: ['B.Tech (CE)', 'Diploma (CE)'],
-          keywords: ['civil', 'ce', 'construction', 'structure', 'survey'],
-        },
-        {
-          key: 'ee',
-          name: 'Electrical Engineering (EE)',
-          about:
-            'Power systems, machines, and industrial electrical. Strong foundation for utilities and electrical maintenance roles.',
-          programs: ['B.Tech (EE)', 'Diploma (EE)'],
-          keywords: ['electrical', 'ee', 'power', 'machines', 'grid'],
-        },
-        {
-          key: 'mgmt',
-          name: 'Management (BBA/MBA)',
-          about:
-            'Business operations, finance, marketing, HR, and analytics. Designed for leadership and professional roles.',
-          programs: ['BBA', 'MBA'],
-          keywords: ['management', 'bba', 'mba', 'marketing', 'finance', 'hr'],
-        },
-        {
-          key: 'commerce',
-          name: 'Commerce (B.Com/M.Com)',
-          about:
-            'Accounting, taxation, auditing, and business studies. Strong career path for corporate finance and accounts.',
-          programs: ['B.Com', 'M.Com'],
-          keywords: ['commerce', 'bcom', 'mcom', 'account', 'tax', 'audit'],
-        },
-        {
-          key: 'pharmacy',
-          name: 'Pharmacy (D.Pharm/B.Pharm)',
-          about:
-            'Pharmaceutical sciences, dispensing, and clinical basics. Focus on compliance and professional practice.',
-          programs: ['D.Pharm', 'B.Pharm'],
-          keywords: ['pharmacy', 'pharm', 'drug', 'clinical', 'medicine'],
-        },
-      ] as {
-        key: string;
-        name: string;
-        about: string;
-        programs: string[];
-        keywords: string[];
-      }[],
-    []
-  );
+  const initialDepartments = [
+    {
+      key: 'cse',
+      name: 'Computer Science & Engineering (CSE)',
+      about:
+        'Software engineering, systems, cloud, and modern computing foundations. Ideal for product, full‑stack, and system roles.',
+      programs: ['B.Tech (CSE)', 'BCA', 'MCA'],
+      keywords: ['cse', 'computer', 'software', 'programming', 'coding', 'ai', 'ml'],
+    },
+    {
+      key: 'it',
+      name: 'Information Technology (IT)',
+      about:
+        'Enterprise IT, networking, database systems, and infrastructure operations. Focused on deployment, security, and support.',
+      programs: ['B.Tech (IT)', 'BSc (IT)'],
+      keywords: ['it', 'network', 'database', 'infrastructure', 'security'],
+    },
+    {
+      key: 'aids',
+      name: 'Artificial Intelligence & Data Science (AI-DS)',
+      about:
+        'Data engineering, analytics, ML pipelines, and model deployment. Strong focus on statistics and real‑world datasets.',
+      programs: ['B.Tech (AI-DS)', 'MSc (Data Science)'],
+      keywords: ['ai', 'aids', 'data', 'datascience', 'ml', 'analytics'],
+    },
+    {
+      key: 'ece',
+      name: 'Electronics & Communication Engineering (ECE)',
+      about:
+        'Electronics, communication systems, embedded fundamentals, and signal processing. Strong base for telecom and embedded roles.',
+      programs: ['B.Tech (ECE)'],
+      keywords: ['ece', 'electronics', 'communication', 'embedded', 'signal', 'iot'],
+    },
+    {
+      key: 'me',
+      name: 'Mechanical Engineering (ME)',
+      about:
+        'Manufacturing, design, thermodynamics, and industrial engineering. Suitable for production and automotive domains.',
+      programs: ['B.Tech (ME)', 'Diploma (ME)'],
+      keywords: ['mechanical', 'me', 'manufacturing', 'design', 'automotive'],
+    },
+    {
+      key: 'ce',
+      name: 'Civil Engineering (CE)',
+      about:
+        'Structural design, construction technology, and project planning. Focus on real infrastructure and site practices.',
+      programs: ['B.Tech (CE)', 'Diploma (CE)'],
+      keywords: ['civil', 'ce', 'construction', 'structure', 'survey'],
+    },
+    {
+      key: 'ee',
+      name: 'Electrical Engineering (EE)',
+      about:
+        'Power systems, machines, and industrial electrical. Strong foundation for utilities and electrical maintenance roles.',
+      programs: ['B.Tech (EE)', 'Diploma (EE)'],
+      keywords: ['electrical', 'ee', 'power', 'machines', 'grid'],
+    },
+    {
+      key: 'mgmt',
+      name: 'Management (BBA/MBA)',
+      about:
+        'Business operations, finance, marketing, HR, and analytics. Designed for leadership and professional roles.',
+      programs: ['BBA', 'MBA'],
+      keywords: ['management', 'bba', 'mba', 'marketing', 'finance', 'hr'],
+    },
+    {
+      key: 'commerce',
+      name: 'Commerce (B.Com/M.Com)',
+      about:
+        'Accounting, taxation, auditing, and business studies. Strong career path for corporate finance and accounts.',
+      programs: ['B.Com', 'M.Com'],
+      keywords: ['commerce', 'bcom', 'mcom', 'account', 'tax', 'audit'],
+    },
+    {
+      key: 'pharmacy',
+      name: 'Pharmacy (D.Pharm/B.Pharm)',
+      about:
+        'Pharmaceutical sciences, dispensing, and clinical basics. Focus on compliance and professional practice.',
+      programs: ['D.Pharm', 'B.Pharm'],
+      keywords: ['pharmacy', 'pharm', 'drug', 'clinical', 'medicine'],
+    },
+  ];
+
+  const departments = useMemo(() => {
+    const base = [...initialDepartments];
+    deptOverrides.forEach(over => {
+      const idx = base.findIndex(d => d.key === over.key);
+      if (idx > -1) base[idx] = { ...base[idx], ...over };
+      else base.push(over);
+    });
+    return base;
+  }, [deptOverrides]);
 
   const selectedDept = useMemo(
     () => departments.find((d) => d.key === selectedDeptKey) || null,
@@ -147,21 +165,46 @@ export default function AcademicsPage() {
   }, [selectedDept, bulletinList]);
 
   const deptList = useMemo(
-    () =>
-      [
-        { key: 'cse', name: 'Computer Science & Engineering (CSE)' },
-        { key: 'it', name: 'Information Technology (IT)' },
-        { key: 'aids', name: 'Artificial Intelligence & Data Science (AI-DS)' },
-        { key: 'ece', name: 'Electronics & Communication Engineering (ECE)' },
-        { key: 'me', name: 'Mechanical Engineering (ME)' },
-        { key: 'ce', name: 'Civil Engineering (CE)' },
-        { key: 'ee', name: 'Electrical Engineering (EE)' },
-        { key: 'mgmt', name: 'Management (BBA/MBA)' },
-        { key: 'commerce', name: 'Commerce (B.Com/M.Com)' },
-        { key: 'pharmacy', name: 'Pharmacy (D.Pharm/B.Pharm)' },
-      ] as { key: string; name: string }[],
-    []
+    () => departments.map(d => ({ key: d.key, name: d.name })),
+    [departments]
   );
+
+  const handleAddBulletin = () => {
+    if (!newBulletin.title) return;
+    const bullet = {
+      id: Date.now(),
+      title: newBulletin.title,
+      type: newBulletin.type,
+      createdAt: new Date().toISOString()
+    };
+    setBulletinOverrides(prev => [bullet, ...prev]);
+    setIsBulletinModalOpen(false);
+    setNewBulletin({ title: '', type: 'Academic' });
+    toast.success('Bulletin added successfully');
+  };
+
+  const handleEditDept = () => {
+    if (!editingDept) return;
+    setDeptOverrides(prev => {
+      const existing = prev.filter(d => d.key !== editingDept.key);
+      return [...existing, editingDept];
+    });
+    setIsDeptEditModalOpen(false);
+    toast.success('Department updated successfully');
+  };
+
+  const handleAddDept = () => {
+    if (!newDept.name || !newDept.key) return;
+    const dept = {
+      ...newDept,
+      programs: newDept.programs.split(',').map(p => p.trim()).filter(Boolean),
+      keywords: newDept.keywords.split(',').map(k => k.trim()).filter(Boolean)
+    };
+    setDeptOverrides(prev => [...prev, dept]);
+    setIsAddDeptModalOpen(false);
+    setNewDept({ key: '', name: '', about: '', programs: '', keywords: '' });
+    toast.success('Department added successfully');
+  };
 
   return (
     <RoleGuard allowedRoles={['admin', 'hr', 'hod', 'professor', 'assistant_professor', 'staff', 'student']}>
@@ -176,9 +219,16 @@ export default function AcademicsPage() {
           </div>
           <div className="flex items-center gap-3">
             {isAdminOrHODOrHR && (
-              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-12 px-6 font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all hover:scale-105">
-                <Plus className="mr-2 h-4 w-4" /> Add Course
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => setIsAddDeptModalOpen(true)}
+                  variant="outline"
+                  className="rounded-2xl border-indigo-500/30 bg-indigo-500/5 text-indigo-400 hover:bg-indigo-500/10 font-black text-xs h-12 px-6 uppercase tracking-widest"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Add Dept
+                </Button>
+               
+              </div>
             )}
           </div>
         </div>
@@ -275,8 +325,22 @@ export default function AcademicsPage() {
 
         <Card className="rounded-[2.5rem] border border-border bg-card shadow-2xl lg:col-span-2 overflow-hidden">
           <CardHeader className="bg-slate-900/30 border-b border-border p-8">
-            <CardTitle className="text-xl font-black text-white uppercase tracking-wider">Academic Bulletin</CardTitle>
-            <CardDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">Live Updates & Notifications</CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-xl font-black text-white uppercase tracking-wider">Academic Bulletin</CardTitle>
+                <CardDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">Live Updates & Notifications</CardDescription>
+              </div>
+              {isAdminOrHODOrHR && (
+                <Button 
+                  onClick={() => setIsBulletinModalOpen(true)}
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-10 w-10 rounded-xl hover:bg-indigo-500/10 text-indigo-500"
+                >
+                  <Plus className="h-5 w-5" />
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-6 space-y-6">
             {bulletinsLoading ? (
@@ -302,12 +366,32 @@ export default function AcademicsPage() {
       <Dialog open={deptDialogOpen} onOpenChange={setDeptDialogOpen}>
         <DialogContent className="max-w-3xl bg-card border-border shadow-2xl rounded-[2.5rem] p-0 overflow-hidden">
           <DialogHeader className="px-8 pt-8 pb-5 border-b border-border/50 bg-slate-900/20">
-            <DialogTitle className="text-2xl font-black text-white uppercase tracking-tighter">
-              {selectedDept?.name || 'Department'}
-            </DialogTitle>
-            <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">
-              Department information & bulletins
-            </DialogDescription>
+            <div className="flex justify-between items-center pr-8">
+              <div>
+                <DialogTitle className="text-2xl font-black text-white uppercase tracking-tighter">
+                  {selectedDept?.name || 'Department'}
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">
+                  Department information & bulletins
+                </DialogDescription>
+              </div>
+              {isAdminOrHODOrHR && (
+                <Button 
+                  onClick={() => {
+                    setEditingDept({
+                      ...selectedDept,
+                      programs: selectedDept?.programs?.join(', '),
+                      keywords: selectedDept?.keywords?.join(', ')
+                    });
+                    setIsDeptEditModalOpen(true);
+                  }}
+                  variant="outline" 
+                  className="rounded-xl border-border h-10 px-4 font-black text-[10px] uppercase tracking-widest text-indigo-400"
+                >
+                  Edit Dept
+                </Button>
+              )}
+            </div>
           </DialogHeader>
 
           <div className="p-8 space-y-8">
@@ -333,7 +417,7 @@ export default function AcademicsPage() {
                 </CardHeader>
                 <CardContent className="p-5 pt-0">
                   <div className="flex flex-wrap gap-2">
-                    {(selectedDept?.programs || []).map((p) => (
+                    {(selectedDept?.programs || []).map((p: string) => (
                       <Badge key={p} className="bg-slate-900 text-slate-300 border border-border rounded-lg font-black text-[10px] uppercase tracking-widest">
                         {p}
                       </Badge>
@@ -375,6 +459,106 @@ export default function AcademicsPage() {
               </CardContent>
             </Card>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulletin Modal */}
+      <Dialog open={isBulletinModalOpen} onOpenChange={setIsBulletinModalOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">Add Bulletin</DialogTitle>
+            <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">New academic notification</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Bulletin Title</Label>
+              <Input 
+                value={newBulletin.title}
+                onChange={(e) => setNewBulletin({ ...newBulletin, title: e.target.value })}
+                className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
+                placeholder="E.G. SEMESTER REGISTRATION OPEN"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Type</Label>
+              <Input 
+                value={newBulletin.type}
+                onChange={(e) => setNewBulletin({ ...newBulletin, type: e.target.value })}
+                className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
+                placeholder="E.G. ACADEMIC, EXAM, EVENT"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulletinModalOpen(false)} className="rounded-xl border-border uppercase font-black text-[10px] tracking-widest">Cancel</Button>
+            <Button onClick={handleAddBulletin} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl uppercase font-black text-[10px] tracking-widest">Add Bulletin</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dept Add Modal */}
+      <Dialog open={isAddDeptModalOpen} onOpenChange={setIsAddDeptModalOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">Add Department</DialogTitle>
+            <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">Create new academic division</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Key (Code)</Label>
+                <Input value={newDept.key} onChange={(e) => setNewDept({ ...newDept, key: e.target.value })} className="bg-slate-950 border-border rounded-xl text-white uppercase text-xs" placeholder="CSE" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Full Name</Label>
+                <Input value={newDept.name} onChange={(e) => setNewDept({ ...newDept, name: e.target.value })} className="bg-slate-950 border-border rounded-xl text-white uppercase text-xs" placeholder="COMPUTER SCIENCE..." />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">About</Label>
+              <Textarea value={newDept.about} onChange={(e) => setNewDept({ ...newDept, about: e.target.value })} className="bg-slate-950 border-border rounded-xl text-white uppercase text-xs h-24" placeholder="DESCRIPTION..." />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Programs (Comma Separated)</Label>
+              <Input value={newDept.programs} onChange={(e) => setNewDept({ ...newDept, programs: e.target.value })} className="bg-slate-950 border-border rounded-xl text-white uppercase text-xs" placeholder="B.TECH, BCA, MCA..." />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Keywords (Comma Separated)</Label>
+              <Input value={newDept.keywords} onChange={(e) => setNewDept({ ...newDept, keywords: e.target.value })} className="bg-slate-950 border-border rounded-xl text-white uppercase text-xs" placeholder="CSE, SOFTWARE..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDeptModalOpen(false)} className="rounded-xl border-border uppercase font-black text-[10px] tracking-widest">Cancel</Button>
+            <Button onClick={handleAddDept} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl uppercase font-black text-[10px] tracking-widest">Create Dept</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dept Edit Modal */}
+      <Dialog open={isDeptEditModalOpen} onOpenChange={setIsDeptEditModalOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">Edit Department</DialogTitle>
+            <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">Update division details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Name</Label>
+              <Input value={editingDept?.name} onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })} className="bg-slate-950 border-border rounded-xl text-white uppercase text-xs" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">About</Label>
+              <Textarea value={editingDept?.about} onChange={(e) => setEditingDept({ ...editingDept, about: e.target.value })} className="bg-slate-950 border-border rounded-xl text-white uppercase text-xs h-24" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Programs (Comma Separated)</Label>
+              <Input value={editingDept?.programs} onChange={(e) => setEditingDept({ ...editingDept, programs: e.target.value })} className="bg-slate-950 border-border rounded-xl text-white uppercase text-xs" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeptEditModalOpen(false)} className="rounded-xl border-border uppercase font-black text-[10px] tracking-widest">Cancel</Button>
+            <Button onClick={handleEditDept} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl uppercase font-black text-[10px] tracking-widest">Update Dept</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

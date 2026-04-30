@@ -14,7 +14,10 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Edit,
+  Trash2,
+  Pencil,
 } from 'lucide-react';
 import { feeApi, studentApi } from '@/services/api';
 import { useFetch } from '@/hooks/use-fetch';
@@ -23,7 +26,14 @@ import { cn, extractList, extractData } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/auth-context';
 import { RoleGuard } from '@/components/auth/role-guard';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle,
+  DialogFooter 
+} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,15 +51,43 @@ export default function FeesPage() {
     paidAmount: 0,
     dueDate: dayjs().add(15, 'day').format('YYYY-MM-DD'),
   });
+
+  const [ledgerOverrides, setLedgerOverrides] = useState<any[]>([]);
+  const [overriddenStats, setOverriddenStats] = useState<Record<string, any>>({});
+  const [catalogList, setCatalogList] = useState([
+    { id: '1', name: 'B.Tech CSE', amount: '₹90,000/yr' },
+    { id: '2', name: 'BBA', amount: '₹65,000/yr' },
+    { id: '3', name: 'MBA', amount: '₹1,20,000/yr' },
+    { id: '4', name: 'B.Com', amount: '₹45,000/yr' },
+  ]);
+
+  const [isStatsEditOpen, setIsStatsEditOpen] = useState(false);
+  const [editingStat, setEditingStat] = useState<any>(null);
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
+  const [editingCatalog, setEditingCatalog] = useState<any>(null);
+  const [isLedgerEditOpen, setIsLedgerEditOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<any>(null);
+
+  const [tempValue, setTempValue] = useState('');
   
-  const { data: feeTransactions, loading: isLoading } = useFetch<any[]>(
+  const { data: feeTransactions, loading: isLoading, execute: refetchLedger } = useFetch<any[]>(
     user?.role === 'student'
       ? () => feeApi.getStudentFees((user as any)?.studentProfile || user?.id || '')
       : () => feeApi.getFees({ page: 1, limit: 200 }),
     { immediate: !!user }
   );
 
-  const transactionList = useMemo(() => extractList<Record<string, any>>(feeTransactions), [feeTransactions]);
+  const transactionList = useMemo(() => {
+    const base = extractList<Record<string, any>>(feeTransactions);
+    const overrides = [...ledgerOverrides];
+    const list = [...base];
+    overrides.forEach(ov => {
+      const idx = list.findIndex(l => (l.id || l._id) === ov.id);
+      if (idx > -1) list[idx] = { ...list[idx], ...ov };
+      else list.unshift(ov);
+    });
+    return list;
+  }, [feeTransactions, ledgerOverrides]);
 
   const { data: studentsData, loading: studentsLoading, execute: refetchStudents } = useFetch<any[]>(
     () => studentApi.getAll({ page: 1, limit: 200 }),
@@ -69,12 +107,15 @@ export default function FeesPage() {
     if (first?._id) setForm((p) => ({ ...p, studentId: String(first._id) }));
   }, [addDialogOpen, students, form.studentId]);
   
-  const { data: stats, loading: statsLoading } = useFetch<any>(
+  const { data: stats, loading: statsLoading, execute: refetchStats } = useFetch<any>(
     user?.role === 'student' ? () => Promise.resolve(null) : feeApi.getStats,
     { immediate: !!user && user?.role !== 'student' }
   );
 
-  const statsData = useMemo(() => extractData<Record<string, any>>(stats), [stats]);
+  const statsData = useMemo(() => {
+    const base = extractData<Record<string, any>>(stats) || {};
+    return { ...base, ...overriddenStats };
+  }, [stats, overriddenStats]);
 
   const feeStats = useMemo(() => {
     const list = transactionList || [];
@@ -86,20 +127,56 @@ export default function FeesPage() {
       const pending = Math.max(0, total - paid);
 
       return [
-        { label: "TOTAL FEES", value: "₹" + total, trend: "Computed", color: "text-blue-500", bg: "bg-blue-500/10", icon: ArrowUpRight },
-        { label: "PAID AMOUNT", value: "₹" + paid, trend: "Verified", color: "text-emerald-500", bg: "bg-emerald-500/10", icon: CheckCircle2 },
-        { label: "PENDING DUES", value: "₹" + pending, trend: "Remaining", color: "text-rose-500", bg: "bg-rose-500/10", icon: Clock },
-        { label: "SCHOLARSHIP", value: "₹0", trend: "N/A", color: "text-indigo-500", bg: "bg-indigo-500/10", icon: AlertCircle },
+        { label: "TOTAL FEES", value: "₹" + total, trend: "Computed", color: "text-blue-500", bg: "bg-blue-500/10", icon: ArrowUpRight, key: 'total' },
+        { label: "PAID AMOUNT", value: "₹" + paid, trend: "Verified", color: "text-emerald-500", bg: "bg-emerald-500/10", icon: CheckCircle2, key: 'paid' },
+        { label: "PENDING DUES", value: "₹" + pending, trend: "Remaining", color: "text-rose-500", bg: "bg-rose-500/10", icon: Clock, key: 'pending' },
+        { label: "SCHOLARSHIP", value: "₹0", trend: "N/A", color: "text-indigo-500", bg: "bg-indigo-500/10", icon: AlertCircle, key: 'scholarship' },
       ];
     }
 
     return [
-      { label: "TOTAL COLLECTION", value: "₹" + (statsData?.totalPaidAmount || 0), trend: "All-time", color: "text-emerald-500", bg: "bg-emerald-500/10", icon: ArrowUpRight },
-      { label: "PAID RECORDS", value: statsData?.paidCount || 0, trend: "Completed", color: "text-emerald-400", bg: "bg-emerald-500/10", icon: CheckCircle2 },
-      { label: "PENDING RECORDS", value: statsData?.pendingCount || 0, trend: "Due", color: "text-rose-500", bg: "bg-rose-500/10", icon: Clock },
-      { label: "TOTAL STUDENTS", value: statsData?.totalRecords || 0, trend: "Fee rows", color: "text-blue-500", bg: "bg-blue-500/10", icon: TrendingUp },
+      { label: "TOTAL COLLECTION", value: "₹" + (statsData?.totalPaidAmount || 0), trend: "All-time", color: "text-emerald-500", bg: "bg-emerald-500/10", icon: ArrowUpRight, key: 'totalPaidAmount' },
+      { label: "PAID RECORDS", value: statsData?.paidCount || 0, trend: "Completed", color: "text-emerald-400", bg: "bg-emerald-500/10", icon: CheckCircle2, key: 'paidCount' },
+      { label: "PENDING RECORDS", value: statsData?.pendingCount || 0, trend: "Due", color: "text-rose-500", bg: "bg-rose-500/10", icon: Clock, key: 'pendingCount' },
+      { label: "TOTAL STUDENTS", value: statsData?.totalRecords || 0, trend: "Fee rows", color: "text-blue-500", bg: "bg-blue-500/10", icon: TrendingUp, key: 'totalRecords' },
     ];
   }, [user?.role, statsData, transactionList]);
+
+  const handleSaveStats = () => {
+    if (!editingStat) return;
+    setOverriddenStats(prev => ({
+      ...prev,
+      [editingStat.key]: tempValue.includes('₹') ? tempValue.replace('₹', '') : tempValue
+    }));
+    setIsStatsEditOpen(false);
+    toast.success('Stats updated');
+  };
+
+  const handleSaveCatalog = () => {
+    if (editingCatalog) {
+      setCatalogList(prev => prev.map(c => c.id === editingCatalog.id ? { ...c, name: editingCatalog.name, amount: editingCatalog.amount } : c));
+      toast.success('Catalog updated');
+    } else {
+      setCatalogList(prev => [...prev, { id: Date.now().toString(), name: tempValue, amount: '₹0/yr' }]);
+      toast.success('Catalog item added');
+    }
+    setIsCatalogModalOpen(false);
+  };
+
+  const handleSaveLedger = () => {
+    if (!editingTransaction) return;
+    setLedgerOverrides(prev => {
+      const existing = prev.filter(p => p.id !== editingTransaction.id);
+      return [...existing, editingTransaction];
+    });
+    setIsLedgerEditOpen(false);
+    toast.success('Transaction updated');
+  };
+
+  const deleteCatalogItem = (id: string) => {
+    setCatalogList(prev => prev.filter(c => c.id !== id));
+    toast.success('Catalog item removed');
+  };
 
   const submitFee = async () => {
     try {
@@ -158,13 +235,33 @@ export default function FeesPage() {
           ))
         ) : (
           feeStats.map((stat, i) => (
-            <Card key={i} className="rounded-[2rem] border border-border bg-card p-6 shadow-xl group">
-              <div className="space-y-3">
-                <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">{stat.label}</h3>
-                <p className={cn("text-3xl font-black", stat.color)}>{stat.value}</p>
-                <div className="flex items-center gap-2">
-                  <stat.icon className={cn("h-3 w-3", stat.color)} />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{stat.trend}</span>
+            <Card key={i} className="rounded-[2rem] border border-border bg-card p-8 shadow-xl group relative overflow-hidden">
+              <div className="flex items-center gap-6">
+                <div className={cn("h-14 w-14 rounded-2xl flex items-center justify-center shadow-inner", stat.bg)}>
+                  <stat.icon className={cn("h-7 w-7", stat.color)} />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <div className="flex justify-between items-start">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</p>
+                    {user?.role !== 'student' && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => {
+                          setEditingStat(stat);
+                          setTempValue(String(stat.value).replace('₹', ''));
+                          setIsStatsEditOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3 text-slate-500" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-end gap-3">
+                    <p className="text-xl font-black text-white uppercase tracking-tight">{stat.value}</p>
+                    <span className={cn("text-[10px] font-black px-2 py-1 rounded-lg mb-1", stat.bg, stat.color)}>{stat.trend}</span>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -258,6 +355,30 @@ export default function FeesPage() {
                     })()
                   )
                 },
+                {
+                  key: 'actions',
+                  label: 'ACTIONS',
+                  render: (_, row) => (
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-lg text-slate-500 hover:text-white"
+                        onClick={() => {
+                          setEditingTransaction({
+                            id: row.id || row._id,
+                            amount: row.amount,
+                            status: row.status,
+                            type: row.type
+                          });
+                          setIsLedgerEditOpen(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )
+                },
               ]}
             />
           </CardContent>
@@ -266,24 +387,65 @@ export default function FeesPage() {
         <div className="space-y-8">
           <Card className="rounded-[2.5rem] border border-border bg-card overflow-hidden shadow-2xl">
             <CardHeader className="bg-slate-900/30 border-b border-border p-8">
-              <CardTitle className="text-xl font-black text-white uppercase tracking-wider">Fee Catalog</CardTitle>
-              <CardDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">Academic Session 2024-25</CardDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="text-xl font-black text-white uppercase tracking-wider">Fee Catalog</CardTitle>
+                  <CardDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">Standard Academic Schedule</CardDescription>
+                </div>
+                {user?.role !== 'student' && (
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="h-10 w-10 rounded-xl hover:bg-emerald-500/10 text-emerald-500"
+                    onClick={() => {
+                      setEditingCatalog(null);
+                      setTempValue('');
+                      setIsCatalogModalOpen(true);
+                    }}
+                  >
+                    <Plus className="h-5 w-5" />
+                  </Button>
+                )}
+              </div>
             </CardHeader>
-            <CardContent className="p-6 space-y-3">
-              {[
-                { name: 'B.Tech CSE', amount: '₹90,000/yr' },
-                { name: 'BBA', amount: '₹65,000/yr' },
-                { name: 'MBA', amount: '₹1,20,000/yr' },
-                { name: 'B.Com', amount: '₹45,000/yr' },
-              ].map((fee, i) => (
-                <div key={i} className="flex items-center justify-between p-5 rounded-2xl bg-slate-950 border border-slate-900 hover:border-emerald-500/30 transition-all cursor-default">
-                  <span className="font-black text-slate-300 uppercase text-xs tracking-widest">{fee.name}</span>
-                  <span className="font-black text-emerald-500">{fee.amount}</span>
+            <CardContent className="p-6 space-y-4">
+              {catalogList.map((item) => (
+                <div key={item.id} className="group flex items-center justify-between p-4 rounded-2xl bg-slate-950/50 border border-slate-900 transition-all hover:border-emerald-500/30">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                      <CreditCard className="h-5 w-5 text-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-white uppercase tracking-tight">{item.name}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{item.amount}</p>
+                    </div>
+                  </div>
+                  {user?.role !== 'student' && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-lg text-slate-500 hover:text-emerald-500"
+                        onClick={() => {
+                          setEditingCatalog(item);
+                          setIsCatalogModalOpen(true);
+                        }}
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-lg text-slate-500 hover:text-rose-500"
+                        onClick={() => deleteCatalogItem(item.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                  {user?.role === 'student' && <ArrowUpRight className="h-4 w-4 text-slate-700" />}
                 </div>
               ))}
-              <Button variant="outline" className="w-full mt-4 rounded-xl border-border bg-slate-950 text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] h-12 hover:text-white transition-all">
-                Full Fee Schedule
-              </Button>
             </CardContent>
           </Card>
 
@@ -397,6 +559,102 @@ export default function FeesPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stats Edit Modal */}
+      <Dialog open={isStatsEditOpen} onOpenChange={setIsStatsEditOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">Edit {editingStat?.label}</DialogTitle>
+            <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">Manual statistics override</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Value</Label>
+            <Input 
+              value={tempValue}
+              onChange={(e) => setTempValue(e.target.value)}
+              className="bg-slate-950 border-border rounded-xl font-black text-white mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsStatsEditOpen(false)} className="rounded-xl border-border font-black text-[10px] tracking-widest uppercase">Cancel</Button>
+            <Button onClick={handleSaveStats} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] tracking-widest uppercase">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Catalog Modal */}
+      <Dialog open={isCatalogModalOpen} onOpenChange={setIsCatalogModalOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">
+              {editingCatalog ? 'Edit Catalog Item' : 'Add Catalog Item'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Course Name</Label>
+              <Input 
+                value={editingCatalog ? editingCatalog.name : tempValue}
+                onChange={(e) => editingCatalog ? setEditingCatalog({...editingCatalog, name: e.target.value}) : setTempValue(e.target.value)}
+                className="bg-slate-950 border-border rounded-xl font-black text-white uppercase text-xs"
+              />
+            </div>
+            {editingCatalog && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Amount Text</Label>
+                <Input 
+                  value={editingCatalog.amount}
+                  onChange={(e) => setEditingCatalog({...editingCatalog, amount: e.target.value})}
+                  className="bg-slate-950 border-border rounded-xl font-black text-white uppercase text-xs"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCatalogModalOpen(false)} className="rounded-xl border-border font-black text-[10px] tracking-widest uppercase">Cancel</Button>
+            <Button onClick={handleSaveCatalog} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] tracking-widest uppercase">Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ledger Edit Modal */}
+      <Dialog open={isLedgerEditOpen} onOpenChange={setIsLedgerEditOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">Edit Transaction</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Amount (₹)</Label>
+              <Input 
+                type="number"
+                value={editingTransaction?.amount}
+                onChange={(e) => setEditingTransaction({...editingTransaction, amount: Number(e.target.value)})}
+                className="bg-slate-950 border-border rounded-xl font-black text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Status</Label>
+              <Select 
+                value={editingTransaction?.status} 
+                onValueChange={(v) => setEditingTransaction({...editingTransaction, status: v})}
+              >
+                <SelectTrigger className="bg-slate-950 border-border rounded-xl text-xs font-black uppercase tracking-widest">
+                  <SelectValue placeholder="STATUS" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-border text-white">
+                  <SelectItem value="Paid">Paid</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsLedgerEditOpen(false)} className="rounded-xl border-border font-black text-[10px] tracking-widest uppercase">Cancel</Button>
+            <Button onClick={handleSaveLedger} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] tracking-widest uppercase">Update</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </RoleGuard>

@@ -73,7 +73,11 @@ interface ApiResponse<T> {
     count?: number;
 }
 
-const SalarySlipManager: React.FC = () => {
+interface Props {
+    employees?: Employee[];
+}
+
+const SalarySlipManager: React.FC<Props> = ({ employees: initialEmployees }) => {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -88,8 +92,12 @@ const SalarySlipManager: React.FC = () => {
 
     // Fetch all employees on component mount
     useEffect(() => {
-        fetchEmployees();
-    }, []);
+        if (initialEmployees && initialEmployees.length > 0) {
+            setEmployees(initialEmployees);
+        } else {
+            fetchEmployees();
+        }
+    }, [initialEmployees]);
 
     const fetchEmployees = async (): Promise<void> => {
         try {

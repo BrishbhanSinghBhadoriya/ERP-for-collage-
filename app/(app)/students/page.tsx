@@ -28,16 +28,24 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogDescription 
+  DialogDescription,
+  DialogFooter
 } from '@/components/ui/dialog';
 import { StudentForm, StudentFormData } from '@/components/forms/student-form';
 import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 export default function StudentsPage() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdmissionModalOpen, setIsAdmissionModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [isEditStatsOpen, setIsEditStatsOpen] = useState(false);
+  const [editingStat, setEditingStat] = useState<{label: string, key: string, value: any} | null>(null);
+  const [tempStatValue, setTempStatValue] = useState('');
+  const [overriddenStats, setOverriddenStats] = useState<Record<string, any>>({});
   
   const { data: studentsData, loading: isLoading, execute: refreshStudents } = useFetch<any[]>(studentApi.getAll);
   const { data: statsDataResponse, loading: statsLoading, execute: refreshStats } = useFetch<any>(dashboardApi.getStats);
@@ -168,7 +176,26 @@ export default function StudentsPage() {
   ], []);
 
   const studentList = useMemo(() => extractList<Record<string, any>>(studentsData), [studentsData]);
-  const statsData = useMemo(() => extractData<Record<string, any>>(statsDataResponse), [statsDataResponse]);
+  const statsData = useMemo(() => {
+    const base = extractData<Record<string, any>>(statsDataResponse) || {};
+    return { ...base, ...overriddenStats };
+  }, [statsDataResponse, overriddenStats]);
+
+  const handleUpdateStat = () => {
+    if (!editingStat) return;
+    setOverriddenStats(prev => ({
+      ...prev,
+      [editingStat.key]: editingStat.key === 'pendingFees' ? parseFloat(tempStatValue) || 0 : parseInt(tempStatValue) || 0
+    }));
+    setIsEditStatsOpen(false);
+    toast.success(`${editingStat.label} updated successfully`);
+  };
+
+  const openEditStat = (label: string, key: string, value: any) => {
+    setEditingStat({ label, key, value });
+    setTempStatValue(String(value).replace('₹', ''));
+    setIsEditStatsOpen(true);
+  };
 
   const filteredStudents = useMemo(() => {
     return studentList.filter((s: any) => 
@@ -211,13 +238,25 @@ export default function StudentsPage() {
           ))
         ) : (
           [
-            { label: "TOTAL ENROLLMENTS", value: statsData?.totalStudents || 0, trend: statsData?.studentTrend || "0%", color: "text-blue-500", bg: "bg-blue-500/10" },
-            { label: "NEW ADMISSIONS", value: statsData?.newAdmissions || 0, trend: "Current", color: "text-purple-500", bg: "bg-purple-500/10" },
-            { label: "OUTSTANDING DUES", value: "₹" + (statsData?.pendingFees || 0), trend: "Alert", color: "text-amber-500", bg: "bg-amber-500/10" },
+            { label: "TOTAL ENROLLMENTS", value: statsData?.totalStudents || 0, trend: statsData?.studentTrend || "0%", color: "text-blue-500", bg: "bg-blue-500/10", key: "totalStudents" },
+            { label: "NEW ADMISSIONS", value: statsData?.newAdmissions || 0, trend: "Current", color: "text-purple-500", bg: "bg-purple-500/10", key: "newAdmissions" },
+            { label: "OUTSTANDING DUES", value: "₹" + (statsData?.pendingFees || 0), trend: "Alert", color: "text-amber-500", bg: "bg-amber-500/10", key: "pendingFees" },
           ].map((stat, i) => (
-            <Card key={i} className="rounded-[2rem] border border-border bg-card p-8 shadow-xl">
+            <Card key={i} className="rounded-[2rem] border border-border bg-card p-8 shadow-xl group relative overflow-hidden">
               <div className="space-y-1">
-                <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">{stat.label}</h3>
+                <div className="flex justify-between items-start">
+                  <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">{stat.label}</h3>
+                  {i > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-900"
+                      onClick={() => openEditStat(stat.label, stat.key, stat.value)}
+                    >
+                      <Edit className="h-3 w-3 text-slate-500" />
+                    </Button>
+                  )}
+                </div>
                 <div className="flex items-end gap-3">
                   <p className={cn("text-4xl font-black", i === 2 ? "text-amber-500" : "text-white")}>{stat.value}</p>
                   <span className={cn("text-[10px] font-black px-2 py-1 rounded-lg mb-1.5", stat.bg, stat.color)}>{stat.trend}</span>
@@ -282,6 +321,44 @@ export default function StudentsPage() {
               isLoading={isSubmitting}
             />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditStatsOpen} onOpenChange={setIsEditStatsOpen}>
+        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-white uppercase tracking-tighter">Edit Statistics</DialogTitle>
+            <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">
+              Manually override {editingStat?.label} value
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{editingStat?.label}</Label>
+              <div className="relative">
+                {editingStat?.key === 'pendingFees' && (
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">₹</span>
+                )}
+                <Input 
+                  type="number"
+                  value={tempStatValue}
+                  onChange={(e) => setTempStatValue(e.target.value)}
+                  className={cn(
+                    "bg-slate-950 border-border rounded-xl font-black text-white",
+                    editingStat?.key === 'pendingFees' ? "pl-8" : "pl-4"
+                  )}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditStatsOpen(false)} className="rounded-xl border-border uppercase font-black text-[10px] tracking-widest">
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateStat} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl uppercase font-black text-[10px] tracking-widest">
+              Save Changes
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
