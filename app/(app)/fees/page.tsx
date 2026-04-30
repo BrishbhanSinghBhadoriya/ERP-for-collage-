@@ -20,6 +20,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { feeApi, studentApi } from '@/services/api';
+import api from '@/lib/api';
 import { useFetch } from '@/hooks/use-fetch';
 import dayjs from 'dayjs';
 import { cn, extractList, extractData } from '@/lib/utils';
@@ -54,12 +55,7 @@ export default function FeesPage() {
 
   const [ledgerOverrides, setLedgerOverrides] = useState<any[]>([]);
   const [overriddenStats, setOverriddenStats] = useState<Record<string, any>>({});
-  const [catalogList, setCatalogList] = useState([
-    { id: '1', name: 'B.Tech CSE', amount: '₹90,000/yr' },
-    { id: '2', name: 'BBA', amount: '₹65,000/yr' },
-    { id: '3', name: 'MBA', amount: '₹1,20,000/yr' },
-    { id: '4', name: 'B.Com', amount: '₹45,000/yr' },
-  ]);
+
 
   const [isStatsEditOpen, setIsStatsEditOpen] = useState(false);
   const [editingStat, setEditingStat] = useState<any>(null);
@@ -111,11 +107,41 @@ export default function FeesPage() {
     user?.role === 'student' ? () => Promise.resolve(null) : feeApi.getStats,
     { immediate: !!user && user?.role !== 'student' }
   );
+  const { data: settings } = useFetch<Record<string, any>>(() => api.get('/api/settings'));
 
   const statsData = useMemo(() => {
     const base = extractData<Record<string, any>>(stats) || {};
-    return { ...base, ...overriddenStats };
-  }, [stats, overriddenStats]);
+    if (!settings) return base;
+    
+    const overrides: Record<string, any> = {};
+    Object.keys(settings).forEach(key => {
+      if (key.startsWith('fee_stats_')) {
+        const k = key.replace('fee_stats_', '');
+        overrides[k] = settings[key];
+      }
+    });
+    return { ...base, ...overrides };
+  }, [stats, settings]);
+
+  const catalogList = useMemo(() => {
+    const base = [
+      { id: '1', name: 'B.Tech CSE', amount: '₹90,000/yr' },
+      { id: '2', name: 'BBA', amount: '₹65,000/yr' },
+      { id: '3', name: 'MBA', amount: '₹1,20,000/yr' },
+      { id: '4', name: 'B.Com', amount: '₹45,000/yr' },
+    ];
+    if (!settings) return base;
+    
+    const catalogOverrides: any[] = [];
+    Object.keys(settings).forEach(key => {
+      if (key.startsWith('fee_catalog_') && settings[key]) {
+        catalogOverrides.push(settings[key]);
+      }
+    });
+    
+    if (catalogOverrides.length === 0) return base;
+    return catalogOverrides;
+  }, [settings]);
 
   const feeStats = useMemo(() => {
     const list = transactionList || [];
@@ -142,40 +168,56 @@ export default function FeesPage() {
     ];
   }, [user?.role, statsData, transactionList]);
 
-  const handleSaveStats = () => {
+  const handleSaveStats = async () => {
     if (!editingStat) return;
-    setOverriddenStats(prev => ({
-      ...prev,
-      [editingStat.key]: tempValue.includes('₹') ? tempValue.replace('₹', '') : tempValue
-    }));
-    setIsStatsEditOpen(false);
-    toast.success('Stats updated');
-  };
-
-  const handleSaveCatalog = () => {
-    if (editingCatalog) {
-      setCatalogList(prev => prev.map(c => c.id === editingCatalog.id ? { ...c, name: editingCatalog.name, amount: editingCatalog.amount } : c));
-      toast.success('Catalog updated');
-    } else {
-      setCatalogList(prev => [...prev, { id: Date.now().toString(), name: tempValue, amount: '₹0/yr' }]);
-      toast.success('Catalog item added');
+    try {
+      await api.put(`/api/settings/fee_stats_${editingStat.key}`, { value: tempValue });
+      toast.success('Stats updated');
+      refetchStats();
+      setIsStatsEditOpen(false);
+    } catch (err: any) {
+      toast.error('Error updating stats');
     }
-    setIsCatalogModalOpen(false);
   };
 
-  const handleSaveLedger = () => {
+  const handleSaveCatalog = async () => {
+    try {
+      if (editingCatalog) {
+        await api.put(`/api/settings/fee_catalog_${editingCatalog.id}`, { value: editingCatalog });
+        toast.success('Catalog updated');
+      } else {
+        await api.put(`/api/settings/fee_catalog_${Date.now()}`, { value: { id: Date.now().toString(), name: tempValue, amount: '₹0/yr' } });
+        toast.success('Catalog item added');
+      }
+      setIsCatalogModalOpen(false);
+    } catch (err: any) {
+      toast.error('Error saving catalog');
+    }
+  };
+
+  const handleSaveLedger = async () => {
     if (!editingTransaction) return;
-    setLedgerOverrides(prev => {
-      const existing = prev.filter(p => p.id !== editingTransaction.id);
-      return [...existing, editingTransaction];
-    });
-    setIsLedgerEditOpen(false);
-    toast.success('Transaction updated');
+    try {
+      await feeApi.updateFee(editingTransaction.id || editingTransaction._id, {
+        amount: editingTransaction.amount,
+        status: editingTransaction.status,
+        type: editingTransaction.type
+      });
+      toast.success('Transaction updated');
+      refetchLedger();
+      setIsLedgerEditOpen(false);
+    } catch (err: any) {
+      toast.error('Error updating transaction');
+    }
   };
 
-  const deleteCatalogItem = (id: string) => {
-    setCatalogList(prev => prev.filter(c => c.id !== id));
-    toast.success('Catalog item removed');
+  const deleteCatalogItem = async (id: string) => {
+    try {
+      await api.put(`/api/settings/fee_catalog_${id}`, { value: null }); // Logic to "remove" from settings
+      toast.success('Catalog item removed');
+    } catch (err: any) {
+      toast.error('Error deleting item');
+    }
   };
 
   const submitFee = async () => {

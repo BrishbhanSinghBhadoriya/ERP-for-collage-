@@ -102,42 +102,51 @@ export default function ExamsPage() {
     maxMarks: 100
   });
 
-  const { data: dateSheet, loading: dateSheetLoading } = useFetch<any[]>(examApi.getDateSheet);
-  const { data: stats, loading: statsLoading } = useFetch<any>(examApi.getStats);
+  const { data: dateSheet, loading: dateSheetLoading, execute: refetchDateSheet } = useFetch<any[]>(examApi.getDateSheet);
+  const { data: stats, loading: statsLoading, execute: refetchStats } = useFetch<any>(examApi.getStats);
 
   useEffect(() => {
     const list = extractList<Record<string, any>>(dateSheet);
-    setExamList(list.length ? list : STATIC_EXAM_DATE_SHEET);
+    setExamList(list.length ? list : []);
   }, [dateSheet]);
 
   const isAdminOrHODOrHR = user?.role === 'admin' || user?.role === 'hod' || user?.role === 'hr';
 
   const statsData = useMemo(() => extractData<Record<string, any>>(stats), [stats]);
 
-  const handleSaveExam = () => {
-    const newExam = {
-      id: editingExam?.id || `exam-${Date.now()}`,
-      date: dayjs(formData.date).toISOString(),
-      course: { name: formData.course },
-      subject: { name: formData.subjectName, code: formData.subjectCode },
-      name: formData.examName,
-      semester: Number(formData.semester),
-      maxMarks: Number(formData.maxMarks),
-    };
+  const handleSaveExam = async () => {
+    try {
+      const payload = {
+        date: dayjs(formData.date).toISOString(),
+        course: formData.course, // Assuming backend handles course ID or Name
+        subject: formData.subjectName, // Assuming backend handles subject ID or Name
+        name: formData.examName,
+        semester: Number(formData.semester),
+        maxMarks: Number(formData.maxMarks),
+      };
 
-    if (editingExam) {
-      setExamList(prev => prev.map(e => e.id === editingExam.id ? newExam : e));
-      toast.success('Exam details updated successfully');
-    } else {
-      setExamList(prev => [newExam, ...prev]);
-      toast.success('New exam deployed successfully');
+      if (editingExam) {
+        await examApi.update(editingExam._id || editingExam.id, payload);
+        toast.success('Exam details updated successfully');
+      } else {
+        await examApi.create(payload);
+        toast.success('New exam deployed successfully');
+      }
+      refetchDateSheet();
+      setIsExamModalOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving exam');
     }
-    setIsExamModalOpen(false);
   };
 
-  const handleDeleteExam = (id: string) => {
-    setExamList(prev => prev.filter(e => e.id !== id));
-    toast.success('Exam record deleted');
+  const handleDeleteExam = async (id: string) => {
+    try {
+      await examApi.delete(id);
+      toast.success('Exam record deleted');
+      refetchDateSheet();
+    } catch (err: any) {
+      toast.error('Error deleting exam');
+    }
   };
 
   const openAddModal = () => {

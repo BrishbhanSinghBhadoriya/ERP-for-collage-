@@ -67,6 +67,8 @@ export const feeApi = {
   getTransactions: () => api.get('/fees/transactions'),
   getStats: () => api.get('/fees/stats'),
   createFeeRecord: (data: any) => api.post('/fees', data),
+  updateFee: (id: string, data: any) => api.put(`/fees/${id}`, data),
+  deleteFee: (id: string) => api.delete(`/fees/${id}`),
   collectFee: (data: any) => api.post('/fees/collect', data),
   getStudentFees: (studentId: string) => api.get(`/fees/student/${studentId}`),
   getReport: (params?: any) => api.get('/fees/report', { params }),
@@ -98,6 +100,9 @@ export const examApi = {
   getDateSheet: (params?: any) => api.get('/exams/date-sheet', { params }),
   getStats: () => api.get('/exams/stats'),
   getUpcoming: () => api.get('/exams/upcoming'),
+  create: (data: any) => api.post('/exams', data),
+  update: (id: string, data: any) => api.put(`/exams/${id}`, data),
+  delete: (id: string) => api.delete(`/exams/${id}`),
 };
 
 // Announcement APIs
@@ -105,6 +110,8 @@ export const announcementApi = {
   getAll: (params?: any) => api.get('/announcements', { params }),
   getById: (id: string) => api.get(`/announcements/${id}`),
   create: (data: any) => api.post('/announcements', data),
+  update: (id: string, data: any) => api.put(`/announcements/${id}`, data),
+  delete: (id: string) => api.delete(`/announcements/${id}`),
 };
 
 // Extra-curricular APIs
@@ -113,6 +120,8 @@ export const activityApi = {
   getStats: () => api.get('/activities/stats'),
   getLeaderboard: () => api.get('/activities/leaderboard'),
   create: (data: any) => api.post('/activities', data),
+  update: (id: string, data: any) => api.put(`/activities/${id}`, data),
+  delete: (id: string) => api.delete(`/activities/${id}`),
   trackParticipation: (data: any) => api.post('/activities/participation', data),
   getStudentParticipation: (studentId: string) => api.get(`/activities/student/${studentId}`),
 };

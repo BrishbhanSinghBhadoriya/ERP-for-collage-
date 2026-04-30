@@ -7,7 +7,9 @@ import {
     getPendingFeesReport,
     getFeeTransactions,
     getFeeStats,
-    collectFee
+    collectFee,
+    updateFeeRecord,
+    deleteFeeRecord
 } from "../controllers/feeController.js";
 import { authenticateToken, authorizeRoles } from "../middleware/auth.js";
 
@@ -19,6 +21,8 @@ router.use(authenticateToken);
 // Admin/HR/HOD/Bursar/Staff can manage fees
 const feeManageRoles = ["admin", "bursar", "staff", "hr", "hod"];
 router.post("/", authorizeRoles(...feeManageRoles), createFeeRecord);
+router.put("/:id", authorizeRoles(...feeManageRoles), updateFeeRecord);
+router.delete("/:id", authorizeRoles(...feeManageRoles), deleteFeeRecord);
 router.get("/", authorizeRoles(...feeManageRoles), getAllFees);
 router.get("/report/pending", authorizeRoles(...feeManageRoles), getPendingFeesReport);
 router.get("/report", authorizeRoles(...feeManageRoles), getPendingFeesReport);

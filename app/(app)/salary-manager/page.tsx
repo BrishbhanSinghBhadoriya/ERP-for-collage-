@@ -92,25 +92,35 @@ const API_URL = `${NEXT_PUBLIC_API_URL}/`;
      return list;
    }, [employeesData, employeeOverrides]);
 
-   const handleSaveHeader = () => {
-     setHeaderData(tempHeader);
-     setIsHeaderModalOpen(false);
-     toast.success("Header updated");
+   const handleSaveHeader = async () => {
+     try {
+       await api.put(`/api/settings/salary_manager_header`, { value: tempHeader });
+       setHeaderData(tempHeader);
+       setIsHeaderModalOpen(false);
+       toast.success("Header updated");
+     } catch (err: any) {
+       toast.error("Error saving header");
+     }
    };
 
-   const handleSavePersonnel = () => {
-     const personnel = {
-       id: editingPersonnel?.id || editingPersonnel?._id || `emp-${Date.now()}`,
-       _id: editingPersonnel?.id || editingPersonnel?._id || `emp-${Date.now()}`,
-       ...personnelForm
-     };
+   const handleSavePersonnel = async () => {
+     try {
+       const personnel = {
+         ...personnelForm
+       };
 
-     setEmployeeOverrides(prev => {
-       const existing = prev.filter(p => (p.id || p._id || p.employeeId) !== (personnel.id || personnel._id || personnel.employeeId));
-       return [personnel, ...existing];
-     });
-     setIsPersonnelModalOpen(false);
-     toast.success(editingPersonnel ? "Personnel record updated" : "Personnel record added");
+       if (editingPersonnel) {
+         await api.put(`/api/hr/employees/${editingPersonnel._id || editingPersonnel.id}`, personnel);
+         toast.success("Personnel record updated");
+       } else {
+         await api.post(`/api/hr/employees`, personnel);
+         toast.success("Personnel record added");
+       }
+       fetchEmployees();
+       setIsPersonnelModalOpen(false);
+     } catch (err: any) {
+       toast.error("Error saving personnel");
+     }
    };
 
    const openAddPersonnel = () => {

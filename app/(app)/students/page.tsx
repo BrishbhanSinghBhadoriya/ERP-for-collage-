@@ -19,6 +19,7 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { studentApi, dashboardApi, courseApi } from '@/services/api';
+import api from '@/lib/api';
 import { useFetch } from '@/hooks/use-fetch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RoleGuard } from '@/components/auth/role-guard';
@@ -181,14 +182,17 @@ export default function StudentsPage() {
     return { ...base, ...overriddenStats };
   }, [statsDataResponse, overriddenStats]);
 
-  const handleUpdateStat = () => {
+  const handleUpdateStat = async () => {
     if (!editingStat) return;
-    setOverriddenStats(prev => ({
-      ...prev,
-      [editingStat.key]: editingStat.key === 'pendingFees' ? parseFloat(tempStatValue) || 0 : parseInt(tempStatValue) || 0
-    }));
-    setIsEditStatsOpen(false);
-    toast.success(`${editingStat.label} updated successfully`);
+    try {
+      const val = editingStat.key === 'pendingFees' ? parseFloat(tempStatValue) || 0 : parseInt(tempStatValue) || 0;
+      await api.put(`/api/settings/student_stats_${editingStat.key}`, { value: val });
+      toast.success(`${editingStat.label} updated successfully`);
+      refreshStats();
+      setIsEditStatsOpen(false);
+    } catch (err: any) {
+      toast.error('Error saving stats');
+    }
   };
 
   const openEditStat = (label: string, key: string, value: any) => {

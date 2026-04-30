@@ -2,7 +2,11 @@ import express from "express";
 import { 
     addActivity, 
     getAllActivities, 
-    addParticipant 
+    addParticipant,
+    updateActivity,
+    deleteActivity,
+    getActivityStats,
+    getLeaderboard
 } from "../controllers/activityController.js";
 import { authenticateToken, authorizeRoles } from "../middleware/auth.js";
 import Activity from "../models/ActivitySchema.js";
@@ -12,8 +16,10 @@ const router = express.Router();
 router.use(authenticateToken);
 
 router.get("/", getAllActivities);
-router.post("/", authorizeRoles("admin", "staff", "faculty"), addActivity);
-router.post("/participant", authorizeRoles("admin", "staff", "faculty"), addParticipant);
+router.post("/", authorizeRoles("admin", "staff", "faculty", "hr", "hod"), addActivity);
+router.put("/:id", authorizeRoles("admin", "staff", "faculty", "hr", "hod"), updateActivity);
+router.delete("/:id", authorizeRoles("admin", "staff", "faculty", "hr", "hod"), deleteActivity);
+router.post("/participant", authorizeRoles("admin", "staff", "faculty", "hr", "hod"), addParticipant);
 router.post("/participation", authorizeRoles("admin", "staff", "faculty"), addParticipant);
 router.get("/student/:studentId", async (req, res) => {
     try {

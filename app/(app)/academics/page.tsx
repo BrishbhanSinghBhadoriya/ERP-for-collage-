@@ -16,6 +16,7 @@ import {
 import { useMemo, useState, useEffect } from 'react';
 
 import { academicsApi, announcementApi } from '@/services/api';
+import api from '@/lib/api';
 import { useFetch } from '@/hooks/use-fetch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RoleGuard } from '@/components/auth/role-guard';
@@ -34,7 +35,7 @@ export default function AcademicsPage() {
   const { user } = useAuth();
   const isAdminOrHODOrHR = user?.role === 'admin' || user?.role === 'hod' || user?.role === 'hr';
   const { data: courses, loading: isLoading } = useFetch<any[]>(academicsApi.getCourseStats);
-  const { data: bulletins, loading: bulletinsLoading } = useFetch<any[]>(announcementApi.getAll);
+  const { data: bulletins, loading: bulletinsLoading, execute: refetchBulletins } = useFetch<any[]>(announcementApi.getAll);
 
   const [bulletinOverrides, setBulletinOverrides] = useState<any[]>([]);
   const [deptOverrides, setDeptOverrides] = useState<any[]>([]);
@@ -169,41 +170,52 @@ export default function AcademicsPage() {
     [departments]
   );
 
-  const handleAddBulletin = () => {
+  const handleAddBulletin = async () => {
     if (!newBulletin.title) return;
-    const bullet = {
-      id: Date.now(),
-      title: newBulletin.title,
-      type: newBulletin.type,
-      createdAt: new Date().toISOString()
-    };
-    setBulletinOverrides(prev => [bullet, ...prev]);
-    setIsBulletinModalOpen(false);
-    setNewBulletin({ title: '', type: 'Academic' });
-    toast.success('Bulletin added successfully');
+    try {
+      await announcementApi.create({
+        subject: newBulletin.title,
+        body: 'Academic notification',
+        targetAudience: ['student', 'faculty'],
+        publishedDate: new Date().toISOString(),
+        expiryDate: dayjs().add(30, 'day').toISOString(),
+        type: newBulletin.type
+      });
+      toast.success('Bulletin added successfully');
+      refetchBulletins();
+      setIsBulletinModalOpen(false);
+      setNewBulletin({ title: '', type: 'Academic' });
+    } catch (err: any) {
+      toast.error('Error adding bulletin');
+    }
   };
 
-  const handleEditDept = () => {
+  const handleEditDept = async () => {
     if (!editingDept) return;
-    setDeptOverrides(prev => {
-      const existing = prev.filter(d => d.key !== editingDept.key);
-      return [...existing, editingDept];
-    });
-    setIsDeptEditModalOpen(false);
-    toast.success('Department updated successfully');
+    try {
+      await api.put(`/api/settings/dept_${editingDept.key}`, { value: editingDept });
+      toast.success('Department updated successfully');
+      setIsDeptEditModalOpen(false);
+    } catch (err: any) {
+      toast.error('Error updating department');
+    }
   };
 
-  const handleAddDept = () => {
+  const handleAddDept = async () => {
     if (!newDept.name || !newDept.key) return;
-    const dept = {
-      ...newDept,
-      programs: newDept.programs.split(',').map(p => p.trim()).filter(Boolean),
-      keywords: newDept.keywords.split(',').map(k => k.trim()).filter(Boolean)
-    };
-    setDeptOverrides(prev => [...prev, dept]);
-    setIsAddDeptModalOpen(false);
-    setNewDept({ key: '', name: '', about: '', programs: '', keywords: '' });
-    toast.success('Department added successfully');
+    try {
+      const dept = {
+        ...newDept,
+        programs: newDept.programs.split(',').map(p => p.trim()).filter(Boolean),
+        keywords: newDept.keywords.split(',').map(k => k.trim()).filter(Boolean)
+      };
+      await api.put(`/api/settings/dept_${newDept.key}`, { value: dept });
+      toast.success('Department added successfully');
+      setIsAddDeptModalOpen(false);
+      setNewDept({ key: '', name: '', about: '', programs: '', keywords: '' });
+    } catch (err: any) {
+      toast.error('Error adding department');
+    }
   };
 
   return (

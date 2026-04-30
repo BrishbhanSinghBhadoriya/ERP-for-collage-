@@ -22,6 +22,28 @@ export const createFeeRecord = async (req, res) => {
     }
 };
 
+// Update fee record
+export const updateFeeRecord = async (req, res) => {
+    try {
+        const fee = await Fee.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!fee) return res.status(404).json({ message: "Fee record not found" });
+        res.status(200).json({ message: "Fee record updated successfully", fee });
+    } catch (error) {
+        res.status(500).json({ message: "Error updating fee record", error: error.message });
+    }
+};
+
+// Delete fee record
+export const deleteFeeRecord = async (req, res) => {
+    try {
+        const fee = await Fee.findByIdAndDelete(req.params.id);
+        if (!fee) return res.status(404).json({ message: "Fee record not found" });
+        res.status(200).json({ message: "Fee record deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Error deleting fee record", error: error.message });
+    }
+};
+
 // Process Payment
 export const processPayment = async (req, res) => {
     const { transactionId, amountPaid } = req.body || {};

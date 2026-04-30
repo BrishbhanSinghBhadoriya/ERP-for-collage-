@@ -19,6 +19,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { attendanceApi, feeApi } from '@/services/api';
+import api from '@/lib/api';
 import { useFetch } from '@/hooks/use-fetch';
 import { cn, extractData } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -147,40 +148,32 @@ export default function ReportsPage() {
     return feeOverrides ? { ...base, ...feeOverrides } : base;
   }, [feeDataFetched, feeOverrides]);
 
-  const handleSaveStat = () => {
+  const handleSaveStat = async () => {
     if (!editingSection) return;
     const val = tempValue.includes('%') ? parseInt(tempValue.replace('%', '')) : parseInt(tempValue);
     
-    if (editingSection.type === 'attendance') {
-      setAttendanceOverrides((prev: any) => ({
-        ...(prev || {}),
-        [editingSection.key]: val,
-        trend: tempTrend || (prev || {}).trend
-      }));
-    } else {
-      setFeeOverrides((prev: any) => ({
-        ...(prev || {}),
-        [editingSection.key]: val
-      }));
+    try {
+      await api.put(`/api/settings/report_stat_${editingSection.type}_${editingSection.key}`, { value: val });
+      if (tempTrend) {
+        await api.put(`/api/settings/report_stat_${editingSection.type}_${editingSection.key}_trend`, { value: tempTrend });
+      }
+      toast.success('Report updated');
+      setIsEditModalOpen(false);
+    } catch (err: any) {
+      toast.error('Error saving report data');
     }
-    setIsEditModalOpen(false);
-    toast.success('Report updated');
   };
 
-  const handleSaveChartItem = () => {
+  const handleSaveChartItem = async () => {
     if (!editingChartItem) return;
     
-    if (editingChartItem.type === 'attendance') {
-      const newTrends = [...(attendanceData.trends || [])];
-      newTrends[editingChartItem.index] = { ...newTrends[editingChartItem.index], percentage: editingChartItem.value };
-      setAttendanceOverrides((prev: any) => ({ ...(prev || {}), trends: newTrends }));
-    } else {
-      const newByCourse = [...(feeData.byCourse || [])];
-      newByCourse[editingChartItem.index] = { ...newByCourse[editingChartItem.index], collected: editingChartItem.value };
-      setFeeOverrides((prev: any) => ({ ...(prev || {}), byCourse: newByCourse }));
+    try {
+      await api.put(`/api/settings/report_chart_${editingChartItem.type}_${editingChartItem.index}`, { value: editingChartItem.value });
+      toast.success('Chart data updated');
+      setIsChartEditModalOpen(false);
+    } catch (err: any) {
+      toast.error('Error saving chart data');
     }
-    setIsChartEditModalOpen(false);
-    toast.success('Chart data updated');
   };
 
   const chartData = activeTab === 'attendance' 
