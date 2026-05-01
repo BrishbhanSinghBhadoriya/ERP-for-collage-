@@ -21,6 +21,7 @@ import libraryRoutes from "./src/routes/libraryRoutes.js";
 import activityRoutes from "./src/routes/activityRoutes.js";
 import holidayRoutes from "./src/routes/holidayRoutes.js";
 import systemSettingsRoutes from "./src/routes/systemSettingsRoutes.js";
+import hostelLeaveRoutes from "./src/routes/hostelLeaveRoutes.js";
 
 import dashboardRoutes from "./src/routes/dashboardRoutes.js";
 import { errorHandler, notFound } from "./src/middleware/errorMiddleware.js";
@@ -84,6 +85,7 @@ app.use("/api/library", libraryRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/holidays", holidayRoutes);
 app.use("/api/settings", systemSettingsRoutes);
+app.use("/api/hostel-leaves", hostelLeaveRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

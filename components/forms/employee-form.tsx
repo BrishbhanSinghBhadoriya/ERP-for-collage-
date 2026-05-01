@@ -248,6 +248,12 @@ export function EmployeeForm({ employee, onSubmit, onCancel, isLoading }: Employ
                   <SelectItem value="employee">Employee</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="hr">HR</SelectItem>
+                  <SelectItem value="warden">Warden</SelectItem>
+                  <SelectItem value="hod">HOD</SelectItem>
+                  <SelectItem value="professor">Professor</SelectItem>
+                  <SelectItem value="assistant professor">Assistant Professor</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
+                  <SelectItem value="student">Student</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>

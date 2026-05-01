@@ -8,7 +8,7 @@ const UserSchema = new mongoose.Schema({
         type: String, 
         enum: [
             "admin", "hod", "professor", "assistant professor", "staff", "student",
-            "hr", "registrar", "bursar", "employee", "manager", "faculty"
+            "hr", "registrar", "bursar", "employee", "manager", "faculty", "warden"
         ], 
         default: "student" 
     },
@@ -20,6 +20,7 @@ const UserSchema = new mongoose.Schema({
     // Status Flags
     isAdmin: { type: Boolean, default: false },
     isHOD: { type: Boolean, default: false },
+    isWarden: { type: Boolean, default: false },
     isProfessor: { type: Boolean, default: false },
     isAssistantProfessor: { type: Boolean, default: false },
     isStaff: { type: Boolean, default: false },

@@ -22,7 +22,7 @@ export const registerValidation = [
     body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
     body('role').optional().isIn([
         'admin', 'hod', 'professor', 'assistant professor', 'staff', 'student',
-        'hr', 'registrar', 'bursar', 'employee', 'manager', 'faculty'
+        'hr', 'registrar', 'bursar', 'employee', 'manager', 'faculty', 'warden'
     ]).withMessage('Invalid role'),
     body('name').optional().notEmpty().withMessage('Name cannot be empty'),
     body('phone').optional().isMobilePhone().withMessage('Invalid phone number'),

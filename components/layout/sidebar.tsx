@@ -47,9 +47,10 @@ const navigation = [
     { name: 'Reports', href: '/reports', icon: FileText, roles: ['admin', 'hr', 'hod', 'professor', 'assistant_professor', 'staff'] },
   ]},
   { group: 'HR & Staff', items: [
-
+    { name: 'Employees', href: '/employees', icon: Users, roles: ['admin', 'hr', 'hod'] },
     { name: 'Holidays', href: '/holidays', icon: CalendarDays, roles: ['admin', 'hr', 'hod', 'professor', 'assistant_professor', 'staff', 'student'] },
     { name: 'Leaves', href: '/leaves', icon: FileText, roles: ['admin', 'hr', 'hod', 'professor', 'assistant_professor', 'staff'] },
+    { name: 'Hostel Leave', href: '/hostel-leave', icon: Home, roles: ['admin', 'hr', 'hod', 'student', 'warden'] },
     { name: 'Salary Manager', href: '/salary-manager', icon: Briefcase, roles: ['admin', 'hr'] },
   ]},
   { group: 'System', items: [
@@ -117,6 +118,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                   userRole === 'assistant_professor' && 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
                   userRole === 'student' && 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
                   userRole === 'staff' && 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+                  userRole === 'warden' && 'bg-orange-500/10 text-orange-400 border-orange-500/20',
                   'bg-slate-500/10 text-slate-400 border-slate-500/20'
                 )}>
                   {userRole}

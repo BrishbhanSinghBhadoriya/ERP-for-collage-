@@ -88,10 +88,10 @@ export const register = async (req, res) => {
         const isBootstrapUser = totalUsers === 0;
         const requestedRole = role || (isBootstrapUser ? "admin" : "student");
 
-        if (!isBootstrapUser && req.user?.role !== "admin" && ["admin", "hr"].includes(requestedRole)) {
+        if (!isBootstrapUser && req.user?.role !== "admin" && ["admin"].includes(requestedRole)) {
             return res.status(403).json({
                 status: "error",
-                message: "Only admin can create admin/hr accounts"
+                message: "Only admin can create admin accounts"
             });
         }
 
@@ -116,7 +116,8 @@ export const register = async (req, res) => {
             isStaff: requestedRole === "staff",
             isStudent: requestedRole === "student",
             isHR: requestedRole === "hr",
-            isEmployee: ["admin", "hod", "professor", "assistant professor", "staff", "hr", "registrar", "bursar", "employee", "manager"].includes(requestedRole),
+            isWarden: requestedRole === "warden",
+            isEmployee: ["admin", "hod", "professor", "assistant professor", "staff", "hr", "registrar", "bursar", "employee", "manager", "warden"].includes(requestedRole),
             isFaculty: ["hod", "professor", "assistant professor", "faculty"].includes(requestedRole),
             status: status || "active" 
         };

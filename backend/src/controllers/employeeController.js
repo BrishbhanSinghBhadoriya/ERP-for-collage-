@@ -106,14 +106,28 @@ export const updateEmployee = async (req, res) => {
     }
 
     // Disallow these fields from being updated here
-    const forbiddenFields = new Set(["_id", "id", "password", "username", "role", "createdAt", "updatedAt", "__v"]);
-
+    const forbiddenFields = new Set(["_id", "id", "password", "username", "createdAt", "updatedAt", "__v"]);
 
     const updates = {};
     for (const [key, value] of Object.entries(req.body || {})) {
       if (!forbiddenFields.has(key)) {
         updates[key] = value;
       }
+    }
+
+    // Special handling for role to update boolean flags
+    if (updates.role) {
+      const requestedRole = updates.role;
+      updates.isAdmin = requestedRole === "admin";
+      updates.isHR = requestedRole === "hr";
+      updates.isHOD = requestedRole === "hod";
+      updates.isWarden = requestedRole === "warden";
+      updates.isStudent = requestedRole === "student";
+      updates.isProfessor = requestedRole === "professor";
+      updates.isAssistantProfessor = requestedRole === "assistant professor";
+      updates.isStaff = requestedRole === "staff";
+      updates.isEmployee = ["admin", "hod", "professor", "assistant professor", "staff", "hr", "registrar", "bursar", "employee", "manager", "warden"].includes(requestedRole);
+      updates.isFaculty = ["hod", "professor", "assistant professor", "faculty"].includes(requestedRole);
     }
 
     if (Object.keys(updates).length === 0) {

@@ -183,7 +183,8 @@ export type UserRole =
   | "employee"
   | "faculty"
   | "registrar"
-  | "bursar";
+  | "bursar"
+  | "warden";
 
 export interface User {
   id: string;
@@ -201,6 +202,7 @@ export interface User {
   isManager?: boolean;
   isHR?: boolean;
   isHOD?: boolean;
+  isWarden?: boolean;
   isProfessor?: boolean;
   isAssistantProfessor?: boolean;
   isStaff?: boolean;
