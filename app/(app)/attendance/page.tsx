@@ -499,6 +499,7 @@ export default function AttendancePage() {
                     label: 'STATUS', 
                     render: (v) => {
                       const normalized = String(v || '').toLowerCase();
+                      const displayValue = typeof v === 'object' ? (v?.name || v?.title || JSON.stringify(v)) : String(v || 'N/A');
                       return (
                         <Badge
                           className={cn(
@@ -509,7 +510,7 @@ export default function AttendancePage() {
                             normalized !== 'present' && normalized !== 'absent' && normalized !== 'late' && "bg-slate-900/30 text-slate-300 border-border"
                           )}
                         >
-                          {v}
+                          {displayValue}
                         </Badge>
                       );
                     }

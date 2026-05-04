@@ -83,7 +83,9 @@ export function DataTable<T extends Record<string, any>>({
   const formatCellValue = (value: any): React.ReactNode => {
     if (value === null || value === undefined) return '';
     if (typeof value === 'object') {
-      return value.name || value.title || value.code || value._id || JSON.stringify(value);
+      const displayValue = value.name || value.title || value.code || value._id;
+      if (displayValue && typeof displayValue !== 'object') return String(displayValue);
+      return JSON.stringify(value);
     }
     return String(value);
   };

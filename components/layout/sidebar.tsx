@@ -121,7 +121,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                   userRole === 'warden' && 'bg-orange-500/10 text-orange-400 border-orange-500/20',
                   'bg-slate-500/10 text-slate-400 border-slate-500/20'
                 )}>
-                  {userRole}
+                  {typeof userRole === 'object' ? (userRole as any)?.name || 'User' : userRole}
                 </UiBadge>
               </div>
             </div>

@@ -312,49 +312,69 @@ export default function ExamsPage() {
                 { 
                   key: 'date', 
                   label: 'TIMELINE', 
-                  render: (v) => (
-                    <div className="flex items-center gap-4 py-1">
-                      <div className="bg-slate-950 border border-slate-900 px-3 py-2 rounded-xl text-center min-w-[70px] shadow-inner">
-                        <span className="block text-[10px] font-black text-blue-500 uppercase tracking-tighter">
-                          {dayjs(v).format('MMM')}
-                        </span>
-                        <span className="block text-xl font-black text-white leading-none">
-                          {dayjs(v).format('DD')}
-                        </span>
+                  render: (v) => {
+                    const date = dayjs(v);
+                    if (!date.isValid()) return <span className="text-xs font-bold text-slate-500">INVALID DATE</span>;
+                    return (
+                      <div className="flex items-center gap-4 py-1">
+                        <div className="bg-slate-950 border border-slate-900 px-3 py-2 rounded-xl text-center min-w-[70px] shadow-inner">
+                          <span className="block text-[10px] font-black text-blue-500 uppercase tracking-tighter">
+                            {date.format('MMM')}
+                          </span>
+                          <span className="block text-xl font-black text-white leading-none">
+                            {date.format('DD')}
+                          </span>
+                        </div>
+                        <span className="font-black text-[10px] text-slate-500 uppercase tracking-widest">{date.format('dddd')}</span>
                       </div>
-                      <span className="font-black text-[10px] text-slate-500 uppercase tracking-widest">{dayjs(v).format('dddd')}</span>
-                    </div>
-                  )
+                    );
+                  }
                 },
                 { 
                       key: 'course',
                       label: 'COURSE',
-                      render: (v) => <span className="font-black text-white text-xs tracking-tight uppercase">{v?.name || 'N/A'}</span>,
+                      render: (v) => {
+                        const name = typeof v === 'object' ? (v?.name || v?.code || 'N/A') : (v || 'N/A');
+                        return <span className="font-black text-white text-xs tracking-tight uppercase">{String(name)}</span>;
+                      },
                 },
                 { 
                       key: 'subject',
                       label: 'SUBJECT',
-                      render: (v) => (
-                        <div className="flex flex-col py-2">
-                          <span className="font-black text-white text-xs tracking-tight uppercase">{v?.name || 'N/A'}</span>
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">{v?.code || ''}</span>
-                        </div>
-                      ),
+                      render: (v) => {
+                        const name = typeof v === 'object' ? (v?.name || 'N/A') : (v || 'N/A');
+                        const code = typeof v === 'object' ? (v?.code || '') : '';
+                        return (
+                          <div className="flex flex-col py-2">
+                            <span className="font-black text-white text-xs tracking-tight uppercase">{String(name)}</span>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">{String(code)}</span>
+                          </div>
+                        );
+                      },
                 },
                 { 
                       key: 'name',
                       label: 'EXAM',
-                      render: (v) => <span className="font-black text-white text-xs tracking-tight uppercase">{v || 'N/A'}</span>,
+                      render: (v) => {
+                        const val = typeof v === 'object' ? (v?.name || v?.title || 'N/A') : (v || 'N/A');
+                        return <span className="font-black text-white text-xs tracking-tight uppercase">{String(val)}</span>;
+                      },
                 },
                 { 
                       key: 'semester',
                       label: 'SEM',
-                      render: (v) => <Badge className="bg-slate-950 text-slate-400 border border-border rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">Sem {v}</Badge>,
+                      render: (v) => {
+                        const val = typeof v === 'object' ? (v?.semester || v?.name || '?') : (v || '?');
+                        return <Badge className="bg-slate-950 text-slate-400 border border-border rounded-lg px-3 py-1 font-black text-[10px] uppercase tracking-widest">Sem {String(val)}</Badge>;
+                      },
                     },
                     { 
                       key: 'maxMarks',
                       label: 'MAX MARKS',
-                      render: (v) => <span className="font-black text-blue-400 text-xs uppercase tracking-widest">{v ?? 'N/A'}</span>,
+                      render: (v) => {
+                        const val = typeof v === 'object' ? (v?.marks || v?.max || '?') : (v ?? 'N/A');
+                        return <span className="font-black text-blue-400 text-xs uppercase tracking-widest">{String(val)}</span>;
+                      },
                 },
                 {
                   key: 'actions',
@@ -474,7 +494,7 @@ export default function ExamsPage() {
                 <SelectContent className="bg-slate-900 border-border z-[150]">
                   {courses.map((course: any) => (
                     <SelectItem key={course._id || course.id} value={course._id || course.id} className="text-xs font-bold uppercase">
-                      {course.name}
+                      {typeof course.name === 'object' ? JSON.stringify(course.name) : String(course.name || 'Unknown')}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -502,7 +522,7 @@ export default function ExamsPage() {
                   <SelectContent className="bg-slate-900 border-border z-[150]">
                     {subjects.map((sub: any) => (
                       <SelectItem key={sub._id || sub.id} value={sub._id || sub.id} className="text-xs font-bold uppercase">
-                        {sub.name}
+                        {typeof sub.name === 'object' ? JSON.stringify(sub.name) : String(sub.name || 'Unknown')}
                       </SelectItem>
                     ))}
                   </SelectContent>

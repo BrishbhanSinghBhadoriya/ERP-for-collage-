@@ -430,37 +430,54 @@ export default function DashboardPage() {
                 </Button>
               </CardHeader>
               <CardContent className="p-0 text-black">
-                <DataTable<Record<string, any>>
-                  data={admissionsList}
-                  isLoading={admissionsLoading}
-                  columns={[
-                    { 
-                      key: 'name', 
-                      label: 'Student Name', 
-                      render: (v, row) => (
-                        <div className="flex items-center gap-3 py-1">
-                          <Avatar className="h-10 w-10 border-2 border-slate-100">
-                            <AvatarFallback className="bg-slate-100 text-slate-800 font-bold text-xs">
-                              {v?.split(' ').map((n: string) => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-bold text-black">{v}</span>
-                        </div>
-                      )
-                    },
-                    { key: 'course', label: 'Course' },
-                    { key: 'date', label: 'Admission Date', render: (v) => dayjs(v).format('DD MMM YYYY') },
-                    { 
-                      key: 'status', 
-                      label: 'Status', 
-                      render: (v) => (
-                        <Badge className={v === 'Confirmed' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : 'bg-amber-100 text-amber-700 hover:bg-amber-100'}>
-                          {v}
-                        </Badge>
-                      )
-                    },
-                  ]}
-                />
+                    <DataTable<Record<string, any>>
+                      data={admissionsList}
+                      isLoading={admissionsLoading}
+                      columns={[
+                        { 
+                          key: 'name', 
+                          label: 'Student Name', 
+                          render: (v, row) => {
+                            const displayName = typeof v === 'object' ? (v?.name || v?.username || 'N/A') : (v || 'N/A');
+                            return (
+                              <div className="flex items-center gap-3 py-1">
+                                <Avatar className="h-10 w-10 border-2 border-slate-100">
+                                  <AvatarFallback className="bg-slate-100 text-slate-800 font-bold text-xs">
+                                    {String(displayName).substring(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="font-bold text-black">{String(displayName)}</span>
+                              </div>
+                            );
+                          }
+                        },
+                        { 
+                          key: 'course', 
+                          label: 'Course',
+                          render: (v) => {
+                            const name = typeof v === 'object' ? (v?.name || v?.code || 'N/A') : (v || 'N/A');
+                            return <span className="font-bold text-black uppercase text-xs">{String(name)}</span>;
+                          }
+                        },
+                        { 
+                          key: 'date', 
+                          label: 'Admission Date', 
+                          render: (v) => <span className="text-slate-500 font-medium">{dayjs(v).isValid() ? dayjs(v).format('DD MMM YYYY') : 'N/A'}</span> 
+                        },
+                        { 
+                          key: 'status', 
+                          label: 'Status', 
+                          render: (v) => {
+                            const status = String(v || 'Pending');
+                            return (
+                              <Badge className={status === 'Confirmed' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : 'bg-amber-100 text-amber-700 hover:bg-amber-100'}>
+                                {status}
+                              </Badge>
+                            );
+                          }
+                        },
+                      ]}
+                    />
               </CardContent>
             </Card>
           )}
@@ -499,16 +516,20 @@ export default function DashboardPage() {
               {announcementsLoading ? (
                 Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)
               ) : announcementsList.length ? (
-                announcementsList.slice(0, 3).map((item: any, i) => (
-                  <div key={i} className="flex gap-4 group cursor-pointer">
-                    <div className="h-2 w-2 rounded-full bg-blue-500 mt-2 flex-shrink-0 group-hover:scale-150 transition-transform"></div>
-                    <div>
-                      <h4 className="font-bold text-black group-hover:text-blue-600 transition-colors">{item.title || item.subject || 'Announcement'}</h4>
-                      <p className="text-sm text-slate-500 font-medium">{dayjs(item.createdAt).fromNow()}</p>
-                      <Badge variant="outline" className="mt-2 text-[10px] py-0 px-2 uppercase tracking-wider font-bold text-slate-600 border-slate-300">{item.type || item.targetAudience?.[0] || 'Update'}</Badge>
+                announcementsList.slice(0, 3).map((item: any, i) => {
+                  const title = typeof item.title === 'object' ? (item.title?.name || item.title?.text) : (item.title || item.subject || 'Announcement');
+                  const type = typeof item.type === 'object' ? (item.type?.name || item.type?.label) : (item.type || item.targetAudience?.[0] || 'Update');
+                  return (
+                    <div key={i} className="flex gap-4 group cursor-pointer">
+                      <div className="h-2 w-2 rounded-full bg-blue-500 mt-2 flex-shrink-0 group-hover:scale-150 transition-transform"></div>
+                      <div>
+                        <h4 className="font-bold text-black group-hover:text-blue-600 transition-colors">{String(title)}</h4>
+                        <p className="text-sm text-slate-500 font-medium">{dayjs(item.createdAt).fromNow()}</p>
+                        <Badge variant="outline" className="mt-2 text-[10px] py-0 px-2 uppercase tracking-wider font-bold text-slate-600 border-slate-300">{String(type)}</Badge>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-sm text-slate-500 font-medium text-center py-4">No recent announcements</p>
               )}
@@ -528,22 +549,26 @@ export default function DashboardPage() {
               {examsLoading ? (
                 Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)
               ) : examsList.length ? (
-                examsList.map((exam: any, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all cursor-default group">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-black group-hover:text-blue-700 transition-colors">{exam.subject}</span>
-                      <span className="text-xs text-slate-500 font-medium">{exam.time}</span>
+                examsList.map((exam: any, i) => {
+                  const subject = typeof exam.subject === 'object' ? (exam.subject?.name || 'N/A') : (exam.subject || 'N/A');
+                  const time = typeof exam.time === 'object' ? (exam.time?.start || 'N/A') : (exam.time || 'N/A');
+                  return (
+                    <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all cursor-default group">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-black group-hover:text-blue-700 transition-colors">{String(subject)}</span>
+                        <span className="text-xs text-slate-500 font-medium">{String(time)}</span>
+                      </div>
+                      <div className="bg-white px-3 py-1 rounded-xl shadow-sm border border-slate-200 text-center min-w-[60px]">
+                        <span className="block text-xs font-bold text-blue-600 uppercase tracking-tighter">
+                          {dayjs(exam.date).isValid() ? dayjs(exam.date).format('MMM') : 'N/A'}
+                        </span>
+                        <span className="block text-lg font-extrabold text-black leading-none">
+                          {dayjs(exam.date).isValid() ? dayjs(exam.date).format('DD') : '??'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="bg-white px-3 py-1 rounded-xl shadow-sm border border-slate-200 text-center min-w-[60px]">
-                      <span className="block text-xs font-bold text-blue-600 uppercase tracking-tighter">
-                        {dayjs(exam.date).format('MMM')}
-                      </span>
-                      <span className="block text-lg font-extrabold text-black leading-none">
-                        {dayjs(exam.date).format('DD')}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-sm text-slate-500 font-medium text-center py-4">No upcoming exams</p>
               )}
