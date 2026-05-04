@@ -15,13 +15,13 @@ const router = express.Router();
 
 router.use(authenticateToken);
 
-router.post("/", authorizeRoles("admin", "registrar", "faculty"), createExam);
+router.post("/", authorizeRoles("admin", "registrar", "faculty", "hr", "hod"), createExam);
 router.get("/upcoming", getUpcomingExams);
 router.get("/stats", getExamStats);
 router.get("/date-sheet", getDateSheet);
 router.get("/", getAllExams);
 router.get("/course/:courseId", getExamsByCourse);
-router.put("/:id", authorizeRoles("admin", "registrar"), updateExam);
-router.delete("/:id", authorizeRoles("admin", "registrar"), deleteExam);
+router.put("/:id", authorizeRoles("admin", "registrar", "hr", "hod"), updateExam);
+router.delete("/:id", authorizeRoles("admin", "registrar", "hr", "hod"), deleteExam);
 
 export default router;

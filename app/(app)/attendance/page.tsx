@@ -34,43 +34,65 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RoleGuard } from '@/components/auth/role-guard';
 
 export default function AttendancePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const userRole = user?.role;
-  const isFacultyOrHR = userRole === 'professor' || userRole === 'assistant_professor' || userRole === 'hod' || userRole === 'admin' || userRole === 'hr';
+
+  const isFacultyOrHR = useMemo(() => {
+    if (!userRole) return false;
+    const normalizedRole = userRole.toLowerCase().replace(/_/g, ' ').trim();
+    return [
+      'admin', 
+      'hod', 
+      'professor', 
+      'assistant professor', 
+      'faculty', 
+      'staff', 
+      'hr', 
+      'registrar',
+      'manager'
+    ].includes(normalizedRole);
+  }, [userRole]);
+
   const isStudent = userRole === 'student';
   
-  const [activeTab, setActiveTab] = useState<'view' | 'mark'>(isFacultyOrHR ? 'mark' : 'view');
+  const [activeTab, setActiveTab] = useState<'view' | 'mark'>('view');
+
+  // Set default tab once auth loads
+  useEffect(() => {
+    if (!authLoading && user) {
+      setActiveTab(isFacultyOrHR ? 'mark' : 'view');
+    }
+  }, [authLoading, user, isFacultyOrHR]);
+
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(dayjs().format('YYYY-MM-DD'));
 
   // Fetch data
-  const { data: courses } = useFetch<any[]>(courseApi.getAll);
+  const { data: rawCourses, loading: coursesLoading, execute: refetchCourses } = useFetch<any[]>(courseApi.getAll, {
+    onError: (err) => toast.error('Failed to load courses')
+  });
+  const courses = useMemo(() => extractList(rawCourses), [rawCourses]);
+
   const { data: studentsData, loading: studentsLoading, execute: refetchStudents } = useFetch<any[]>(
-    () => (selectedCourseId ? studentApi.getAll({ page: 1, limit: 1000, course: selectedCourseId }) : Promise.resolve([])),
-    { immediate: false }
+    () => (selectedCourseId ? studentApi.getAll({ page: 1, limit: 1000, course: selectedCourseId }) : Promise.resolve({ data: [] })),
+    { 
+      immediate: false,
+      onError: (err) => toast.error('Failed to load students')
+    }
   );
   const studentsInSelectedCourse = useMemo(() => extractList<Record<string, any>>(studentsData), [studentsData]);
 
   const { data: subjectsData, loading: subjectsLoading, execute: refetchSubjects } = useFetch<any[]>(
-    () => (selectedCourseId ? academicsApi.getSubjectsByCourse(selectedCourseId) : Promise.resolve([])),
-    { immediate: false }
+    () => (selectedCourseId ? academicsApi.getSubjectsByCourse(selectedCourseId) : Promise.resolve({ data: [] })),
+    { 
+      immediate: false,
+      onError: (err) => toast.error('Failed to load subjects')
+    }
   );
 
-  const HARDCODED_SUBJECTS = [
-    { _id: 'sub1', name: 'Engineering Mathematics', semester: 1, faculty: { name: 'Dr. Sharma' } },
-    { _id: 'sub2', name: 'Data Structures', semester: 3, faculty: { name: 'Prof. Gupta' } },
-    { _id: 'sub3', name: 'Computer Networks', semester: 5, faculty: { name: 'Dr. Verma' } },
-    { _id: 'sub4', name: 'Operating Systems', semester: 4, faculty: { name: 'Prof. Reddy' } },
-    { _id: 'sub5', name: 'Database Management', semester: 4, faculty: { name: 'Dr. Singh' } },
-    { _id: 'sub6', name: 'Software Engineering', semester: 6, faculty: { name: 'Prof. Joshi' } },
-    { _id: 'sub7', name: 'Cyber Security', semester: 7, faculty: { name: 'Dr. Kapoor' } },
-    { _id: 'sub8', name: 'Artificial Intelligence', semester: 8, faculty: { name: 'Prof. Malhotra' } },
-  ];
-
   const subjects = useMemo(() => {
-    const fetched = extractList<Record<string, any>>(subjectsData);
-    return fetched.length > 0 ? fetched : HARDCODED_SUBJECTS;
+    return extractList<Record<string, any>>(subjectsData);
   }, [subjectsData]);
 
   useEffect(() => {
@@ -89,13 +111,16 @@ export default function AttendancePage() {
   }, [subjects, selectedSubjectId]);
 
   const fetchClassAttendance = useCallback(() => {
-    if (!selectedSubjectId) return Promise.resolve([]);
+    if (!selectedSubjectId) return Promise.resolve({ data: [] });
     return attendanceApi.getAttendance({ date: selectedDate, subjectId: selectedSubjectId });
   }, [selectedDate, selectedSubjectId]);
 
   const { data: attendanceData, loading: isLoading, execute: refetchAttendance } = useFetch<any[]>(
     fetchClassAttendance,
-    { immediate: false }
+    { 
+      immediate: false,
+      onError: (err) => toast.error('Failed to load attendance records')
+    }
   );
 
   useEffect(() => {
@@ -105,8 +130,11 @@ export default function AttendancePage() {
   const attendanceList = useMemo(() => extractList<Record<string, any>>(attendanceData), [attendanceData]);
 
   const { data: myAttendanceData, loading: myAttendanceLoading } = useFetch<any[]>(
-    () => (user?.id ? attendanceApi.getStudentAttendance(String(user.id)) : Promise.resolve([])),
-    { immediate: isStudent }
+    () => (user?.id ? attendanceApi.getStudentAttendance(String(user.id)) : Promise.resolve({ data: [] })),
+    { 
+      immediate: isStudent,
+      onError: (err) => toast.error('Failed to load your attendance')
+    }
   );
   const myAttendanceList = useMemo(() => extractList<Record<string, any>>(myAttendanceData), [myAttendanceData]);
 
@@ -178,7 +206,10 @@ export default function AttendancePage() {
   };
 
   return (
-    <RoleGuard allowedRoles={['admin', 'hod', 'professor', 'assistant_professor', 'staff', 'student', 'hr']}>
+    <RoleGuard allowedRoles={[
+      'admin', 'hod', 'professor', 'assistant_professor', 'assistant professor', 
+      'staff', 'student', 'hr', 'faculty', 'registrar', 'manager'
+    ]}>
       <div className="space-y-8 pb-10 bg-background">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -275,36 +306,56 @@ export default function AttendancePage() {
                 {!isStudent && (
                   <>
                     <Select value={selectedCourseId} onValueChange={handleCourseChange}>
-                      <SelectTrigger className="w-52 bg-slate-950 border-border rounded-xl text-xs font-black h-11 uppercase tracking-widest">
-                        <SelectValue placeholder="SELECT COURSE" />
+                      <SelectTrigger className="w-52 bg-slate-900 border-border rounded-xl text-xs font-black h-11 uppercase tracking-widest text-white">
+                        <SelectValue placeholder={coursesLoading ? "LOADING..." : "SELECT COURSE"} />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-border">
-                        {(courses || []).map((course: any) => (
-                          <SelectItem
-                            key={course.id || course._id}
-                            value={String(course.id || course._id)}
-                            className="text-xs font-bold uppercase tracking-widest"
-                          >
-                            {course.name}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="bg-slate-900 border-border z-[100]">
+                        {coursesLoading ? (
+                          <div className="p-4 text-center text-xs font-bold text-slate-500 uppercase tracking-widest">
+                            Loading courses...
+                          </div>
+                        ) : courses.length > 0 ? (
+                          courses.map((course: any) => (
+                            <SelectItem
+                              key={course.id || course._id}
+                              value={String(course.id || course._id)}
+                              className="text-xs font-bold uppercase tracking-widest text-white hover:bg-slate-800"
+                            >
+                              {course.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs font-bold text-slate-500 uppercase tracking-widest">
+                            No courses found
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
 
-                    <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={!selectedCourseId}>
-                      <SelectTrigger className="w-56 bg-slate-950 border-border rounded-xl text-xs font-black h-11 uppercase tracking-widest">
-                        <SelectValue placeholder="SELECT SUBJECT" />
+                    <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={!selectedCourseId || subjectsLoading}>
+                      <SelectTrigger className="w-56 bg-slate-900 border-border rounded-xl text-xs font-black h-11 uppercase tracking-widest text-white disabled:opacity-50">
+                        <SelectValue placeholder={subjectsLoading ? "LOADING..." : "SELECT SUBJECT"} />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-border">
-                        {(subjects || []).map((subject: any) => (
-                          <SelectItem
-                            key={subject.id || subject._id}
-                            value={String(subject.id || subject._id)}
-                            className="text-xs font-bold uppercase tracking-widest"
-                          >
-                            {subject.name}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="bg-slate-900 border-border z-[100]">
+                        {subjectsLoading ? (
+                          <div className="p-4 text-center text-xs font-bold text-slate-500 uppercase tracking-widest">
+                            Loading subjects...
+                          </div>
+                        ) : subjects.length > 0 ? (
+                          subjects.map((subject: any) => (
+                            <SelectItem
+                              key={subject.id || subject._id}
+                              value={String(subject.id || subject._id)}
+                              className="text-xs font-bold uppercase tracking-widest text-white hover:bg-slate-800"
+                            >
+                              {subject.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs font-bold text-slate-500 uppercase tracking-widest">
+                            No subjects found
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
 

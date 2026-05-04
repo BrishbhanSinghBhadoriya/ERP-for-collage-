@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Course from "../models/CourseSchema.js";
 import Subject from "../models/SubjectSchema.js";
 import Student from "../models/StudentSchema.js";
@@ -94,9 +95,14 @@ export const getAllSubjects = async (req, res) => {
 
 export const getSubjectsByCourse = async (req, res) => {
     try {
-        const subjects = await Subject.find({ course: req.params.courseId }).populate("faculty", "name email");
+        const { courseId } = req.params;
+        if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+            return res.status(200).json([]);
+        }
+        const subjects = await Subject.find({ course: courseId }).populate("faculty", "name email");
         res.status(200).json(subjects);
     } catch (error) {
+        console.error("getSubjectsByCourse error:", error);
         res.status(500).json({ message: "Error fetching subjects", error: error.message });
     }
 };

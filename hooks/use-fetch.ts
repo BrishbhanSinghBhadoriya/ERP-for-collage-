@@ -10,10 +10,11 @@ interface UseFetchOptions {
 
 export function useFetch<T>(
   apiCall: (...args: any[]) => Promise<any>,
-  options: UseFetchOptions = { immediate: true }
+  options: UseFetchOptions = {}
 ) {
+  const { immediate = true } = options;
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState<boolean>(!!options.immediate);
+  const [loading, setLoading] = useState<boolean>(!!immediate);
   const [error, setError] = useState<any>(null);
 
   // Use refs to keep track of the latest apiCall and options without triggering re-renders
@@ -44,10 +45,10 @@ export function useFetch<T>(
   }, []);
 
   useEffect(() => {
-    if (options.immediate) {
+    if (immediate) {
       execute();
     }
-  }, [execute, options.immediate]);
+  }, [execute, immediate]);
 
   return { data, loading, error, execute, setData };
 }

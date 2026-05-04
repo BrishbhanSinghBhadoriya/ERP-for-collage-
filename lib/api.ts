@@ -3,9 +3,12 @@ import Cookies from 'js-cookie';
 import { authService } from '@/lib/auth';
 import { toast } from 'sonner';
 
-const RAW_BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://hrmssaurabh2.onrender.com').replace(/\/+$/, '');
+const RAW_BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001/api').replace(/\/+$/, '');
 // Support env values with or without a trailing /api segment.
-const NEXT_PUBLIC_BACKEND_URL = RAW_BACKEND_URL.replace(/\/api$/i, '');
+let NEXT_PUBLIC_BACKEND_URL = RAW_BACKEND_URL;
+if (RAW_BACKEND_URL.toLowerCase().endsWith('/api')) {
+  NEXT_PUBLIC_BACKEND_URL = RAW_BACKEND_URL.replace(/\/api$/i, '');
+}
 const API_BASE_URL = `${NEXT_PUBLIC_BACKEND_URL}/api`;
 
 const api = axios.create({

@@ -24,10 +24,10 @@ router.use(authenticateToken);
 router.post("/courses", authorizeRoles("admin", "registrar", "hod"), createCourse);
 router.get("/courses", getAllCourses);
 router.get("/courses/departments", getDepartments);
+router.get("/courses/stats", getCourseStats);
 router.get("/courses/:id", getCourseById);
 router.put("/courses/:id", authorizeRoles("admin", "registrar", "hod"), updateCourse);
 router.delete("/courses/:id", authorizeRoles("admin", "registrar", "hod"), deleteCourse);
-router.get("/courses/stats", getCourseStats);
 
 // Subject Routes
 router.post("/subjects", authorizeRoles("admin", "registrar", "hod"), createSubject);

@@ -1,13 +1,34 @@
+import mongoose from "mongoose";
 import StudentAttendance from "../models/StudentAttendance.js";
 import Student from "../models/StudentSchema.js";
 
 // Mark attendance for a single student
 export const markAttendance = async (req, res) => {
     try {
-        const attendance = new StudentAttendance(req.body);
+        const { student, subject, status, date, semester } = req.body;
+
+        // Basic validation
+        if (!student || !subject || !status || !date || !semester) {
+            return res.status(400).json({ message: "Missing required fields" });
+        }
+
+        // Validate ObjectIds
+        if (!mongoose.Types.ObjectId.isValid(student) || !mongoose.Types.ObjectId.isValid(subject)) {
+            return res.status(400).json({ message: "Invalid student or subject ID" });
+        }
+
+        const attendance = new StudentAttendance({
+            student,
+            subject,
+            status,
+            date: new Date(date),
+            semester
+        });
+
         await attendance.save();
         res.status(201).json({ message: "Attendance marked successfully", attendance });
     } catch (error) {
+        console.error("markAttendance error:", error);
         res.status(500).json({ message: "Error marking attendance", error: error.message });
     }
 };
@@ -18,17 +39,32 @@ export const bulkMarkAttendance = async (req, res) => {
     // attendanceData: [{ student: id, status: 'Present'|'Absent'|'Late' }]
 
     try {
-        const attendanceRecords = attendanceData.map(record => ({
-            student: record.student,
-            subject,
-            date: new Date(date),
-            status: record.status,
-            semester
-        }));
+        if (!subject || !date || !semester || !attendanceData || !Array.isArray(attendanceData)) {
+            return res.status(400).json({ message: "Missing required fields for bulk marking" });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(subject)) {
+            return res.status(400).json({ message: "Invalid subject ID" });
+        }
+
+        const attendanceRecords = attendanceData
+            .filter(record => mongoose.Types.ObjectId.isValid(record.student))
+            .map(record => ({
+                student: record.student,
+                subject,
+                date: new Date(date),
+                status: record.status,
+                semester
+            }));
+
+        if (attendanceRecords.length === 0) {
+            return res.status(400).json({ message: "No valid student records provided" });
+        }
 
         await StudentAttendance.insertMany(attendanceRecords);
         res.status(201).json({ message: "Bulk attendance marked successfully" });
     } catch (error) {
+        console.error("bulkMarkAttendance error:", error);
         res.status(500).json({ message: "Error bulk marking attendance", error: error.message });
     }
 };
@@ -36,7 +72,12 @@ export const bulkMarkAttendance = async (req, res) => {
 // Get attendance by student
 export const getStudentAttendance = async (req, res) => {
     try {
-        const attendance = await StudentAttendance.find({ student: req.params.studentId })
+        const { studentId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(studentId)) {
+            return res.status(400).json({ message: "Invalid student ID" });
+        }
+
+        const attendance = await StudentAttendance.find({ student: studentId })
             .populate({
                 path: "student",
                 populate: { path: "user", select: "name email profilePicture" },
@@ -47,6 +88,7 @@ export const getStudentAttendance = async (req, res) => {
             });
         res.status(200).json(attendance);
     } catch (error) {
+        console.error("getStudentAttendance error:", error);
         res.status(500).json({ message: "Error fetching attendance", error: error.message });
     }
 };
@@ -55,6 +97,14 @@ export const getStudentAttendance = async (req, res) => {
 export const getClassAttendance = async (req, res) => {
     const { subjectId, date } = req.query;
     try {
+        if (!subjectId) {
+            return res.status(200).json([]);
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(subjectId)) {
+            return res.status(400).json({ message: "Invalid subject ID" });
+        }
+
         const query = { subject: subjectId };
         if (date) {
             const startDate = new Date(date);
@@ -74,6 +124,7 @@ export const getClassAttendance = async (req, res) => {
             });
         res.status(200).json(attendance);
     } catch (error) {
+        console.error("getClassAttendance error:", error);
         res.status(500).json({ message: "Error fetching class attendance", error: error.message });
     }
 };

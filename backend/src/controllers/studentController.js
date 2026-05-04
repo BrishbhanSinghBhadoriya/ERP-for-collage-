@@ -148,7 +148,26 @@ export const getAllStudents = async (req, res) => {
             }
         }
 
-        if (course) query.course = course;
+        if (course) {
+            if (mongoose.Types.ObjectId.isValid(course)) {
+                query.course = course;
+            } else {
+                // If course is not a valid ID, it might be a name. 
+                // But StudentSchema expects an ID. So we should find the ID first.
+                const foundCourse = await Course.findOne({ name: { $regex: new RegExp(`^${course}$`, 'i') } });
+                if (foundCourse) {
+                    query.course = foundCourse._id;
+                } else {
+                    // If course is neither valid ID nor found by name, return empty list instead of 500
+                    return res.status(200).json({
+                        students: [],
+                        totalPages: 0,
+                        currentPage: page,
+                        totalStudents: 0
+                    });
+                }
+            }
+        }
         if (year) query.year = year;
 
         const students = await Student.find(query)
@@ -156,6 +175,7 @@ export const getAllStudents = async (req, res) => {
             .populate("course")
             .limit(limit * 1)
             .skip((page - 1) * limit)
+            .lean() // Use lean for better performance and to avoid Mongoose document issues
             .exec();
 
         const count = await Student.countDocuments(query);
@@ -163,10 +183,11 @@ export const getAllStudents = async (req, res) => {
         res.status(200).json({
             students,
             totalPages: Math.ceil(count / limit),
-            currentPage: page,
+            currentPage: Number(page),
             totalStudents: count
         });
     } catch (error) {
+        console.error("getAllStudents error:", error);
         res.status(500).json({ message: "Error fetching students", error: error.message });
     }
 };

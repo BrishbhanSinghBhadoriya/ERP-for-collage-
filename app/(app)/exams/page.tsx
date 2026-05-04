@@ -18,7 +18,7 @@ import {
   Edit,
   Trash2,
 } from 'lucide-react';
-import { examApi } from '@/services/api';
+import { examApi, courseApi, academicsApi } from '@/services/api';
 import { useFetch } from '@/hooks/use-fetch';
 import dayjs from 'dayjs';
 import { cn, extractList, extractData } from '@/lib/utils';
@@ -37,6 +37,14 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 
 const STATIC_EXAM_DATE_SHEET: Record<string, any>[] = [
   {
@@ -105,6 +113,23 @@ export default function ExamsPage() {
   const { data: dateSheet, loading: dateSheetLoading, execute: refetchDateSheet } = useFetch<any[]>(examApi.getDateSheet);
   const { data: stats, loading: statsLoading, execute: refetchStats } = useFetch<any>(examApi.getStats);
 
+  // Fetch courses and subjects for dropdowns
+  const { data: rawCourses } = useFetch<any[]>(courseApi.getAll);
+  const courses = useMemo(() => extractList(rawCourses), [rawCourses]);
+
+  const [selectedCourseForModal, setSelectedCourseForModal] = useState<string>('');
+  const { data: rawSubjects, loading: subjectsLoading, execute: fetchSubjects } = useFetch<any[]>(
+    () => (selectedCourseForModal ? academicsApi.getSubjectsByCourse(selectedCourseForModal) : Promise.resolve({ data: [] })),
+    { immediate: false }
+  );
+  const subjects = useMemo(() => extractList(rawSubjects), [rawSubjects]);
+
+  useEffect(() => {
+    if (selectedCourseForModal) {
+      fetchSubjects();
+    }
+  }, [selectedCourseForModal, fetchSubjects]);
+
   useEffect(() => {
     const list = extractList<Record<string, any>>(dateSheet);
     setExamList(list.length ? list : []);
@@ -116,10 +141,15 @@ export default function ExamsPage() {
 
   const handleSaveExam = async () => {
     try {
+      if (!formData.date || !formData.course || !formData.subjectName || !formData.examName || !formData.semester || !formData.maxMarks) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
       const payload = {
         date: dayjs(formData.date).toISOString(),
-        course: formData.course, // Assuming backend handles course ID or Name
-        subject: formData.subjectName, // Assuming backend handles subject ID or Name
+        course: formData.course, 
+        subject: formData.subjectName, 
         name: formData.examName,
         semester: Number(formData.semester),
         maxMarks: Number(formData.maxMarks),
@@ -133,9 +163,11 @@ export default function ExamsPage() {
         toast.success('New exam deployed successfully');
       }
       refetchDateSheet();
+      refetchStats();
       setIsExamModalOpen(false);
     } catch (err: any) {
-      toast.error(err.message || 'Error saving exam');
+      const errorMsg = err?.response?.data?.message || err.message || 'Error saving exam';
+      toast.error(errorMsg);
     }
   };
 
@@ -151,6 +183,7 @@ export default function ExamsPage() {
 
   const openAddModal = () => {
     setEditingExam(null);
+    setSelectedCourseForModal('');
     setFormData({
       date: dayjs().format('YYYY-MM-DD'),
       course: '',
@@ -165,10 +198,12 @@ export default function ExamsPage() {
 
   const openEditModal = (exam: any) => {
     setEditingExam(exam);
+    const courseId = exam.course?._id || exam.course?.id || '';
+    setSelectedCourseForModal(courseId);
     setFormData({
       date: dayjs(exam.date).format('YYYY-MM-DD'),
-      course: exam.course?.name || '',
-      subjectName: exam.subject?.name || '',
+      course: courseId,
+      subjectName: exam.subject?._id || exam.subject?.id || '',
       subjectCode: exam.subject?.code || '',
       examName: exam.name || '',
       semester: exam.semester || 1,
@@ -426,30 +461,60 @@ export default function ExamsPage() {
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Course Name</Label>
-              <Input 
-                value={formData.course}
-                onChange={(e) => setFormData({ ...formData, course: e.target.value })}
-                className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
-                placeholder="E.G. B.TECH CSE"
-              />
+              <Select 
+                value={formData.course} 
+                onValueChange={(val) => {
+                  setSelectedCourseForModal(val);
+                  setFormData({ ...formData, course: val, subjectName: '', subjectCode: '' });
+                }}
+              >
+                <SelectTrigger className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs">
+                  <SelectValue placeholder="SELECT COURSE" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-border z-[150]">
+                  {courses.map((course: any) => (
+                    <SelectItem key={course._id || course.id} value={course._id || course.id} className="text-xs font-bold uppercase">
+                      {course.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Subject Name</Label>
-                <Input 
-                  value={formData.subjectName}
-                  onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
-                  className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
-                  placeholder="E.G. DBMS"
-                />
+                <Select 
+                  value={formData.subjectName} 
+                  onValueChange={(val) => {
+                    const sub = subjects.find((s: any) => (s._id || s.id) === val);
+                    setFormData({ 
+                      ...formData, 
+                      subjectName: val, 
+                      subjectCode: sub?.code || '',
+                      semester: sub?.semester || formData.semester 
+                    });
+                  }}
+                  disabled={!formData.course || subjectsLoading}
+                >
+                  <SelectTrigger className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs">
+                    <SelectValue placeholder={subjectsLoading ? "LOADING..." : "SELECT SUBJECT"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-border z-[150]">
+                    {subjects.map((sub: any) => (
+                      <SelectItem key={sub._id || sub.id} value={sub._id || sub.id} className="text-xs font-bold uppercase">
+                        {sub.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Subject Code</Label>
                 <Input 
                   value={formData.subjectCode}
-                  onChange={(e) => setFormData({ ...formData, subjectCode: e.target.value })}
-                  className="bg-slate-950 border-border rounded-xl font-bold text-white uppercase text-xs"
-                  placeholder="E.G. CSE-203"
+                  readOnly
+                  className="bg-slate-900 border-border rounded-xl font-bold text-slate-500 uppercase text-xs cursor-not-allowed"
+                  placeholder="AUTO-FILLED"
                 />
               </div>
             </div>
